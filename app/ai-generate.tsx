@@ -1,10 +1,68 @@
-import { Text, View, ScrollView, TextInput, TouchableOpacity, Alert } from 'react-native';
+import React, { useState } from 'react';
+import {
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  TextInput,
+  Alert,
+  ActivityIndicator,
+  StyleSheet,
+} from 'react-native';
 import { router } from 'expo-router';
-import { useState } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useFonts, Inter_400Regular, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
 import { commonStyles, colors, buttonStyles } from '../styles/commonStyles';
+import { useAffirmationStore } from '../store/affirmationStore';
+import { useSettingsStore } from '../store/settingsStore';
+import { apiService } from '../services/apiService';
+import { audioService } from '../services/audioService';
+
+const QUICK_PROMPTS = [
+  {
+    id: 'sleep-anxiety',
+    title: 'Sleep & Anxiety Relief',
+    prompt: 'I need help falling asleep and reducing anxiety',
+    intent: 'sleep',
+    tone: 'soft',
+  },
+  {
+    id: 'morning-confidence',
+    title: 'Morning Confidence Boost',
+    prompt: 'I want to start my day with confidence and energy',
+    intent: 'confidence',
+    tone: 'uplifting',
+  },
+  {
+    id: 'self-love',
+    title: 'Self-Love & Acceptance',
+    prompt: 'I want to practice self-love and acceptance',
+    intent: 'love',
+    tone: 'soft',
+  },
+  {
+    id: 'healing-recovery',
+    title: 'Healing & Recovery',
+    prompt: 'I need support for healing and recovery',
+    intent: 'healing',
+    tone: 'neutral',
+  },
+  {
+    id: 'abundance-success',
+    title: 'Abundance & Success',
+    prompt: 'I want to attract abundance and success',
+    intent: 'abundance',
+    tone: 'uplifting',
+  },
+  {
+    id: 'focus-productivity',
+    title: 'Focus & Productivity',
+    prompt: 'I need better focus and productivity',
+    intent: 'focus',
+    tone: 'neutral',
+  },
+];
 
 export default function AIGenerateScreen() {
   const [fontsLoaded] = useFonts({
@@ -13,318 +71,456 @@ export default function AIGenerateScreen() {
     Inter_700Bold,
   });
 
-  const [prompt, setPrompt] = useState('');
-  const [selectedTone, setSelectedTone] = useState('calming');
-  const [selectedLength, setSelectedLength] = useState('medium');
+  const [customPrompt, setCustomPrompt] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
-  const [generatedText, setGeneratedText] = useState('');
+  const [selectedPrompt, setSelectedPrompt] = useState<string | null>(null);
 
-  const toneOptions = [
-    { id: 'calming', name: 'Calming & Peaceful', icon: 'leaf' },
-    { id: 'empowering', name: 'Empowering & Strong', icon: 'flash' },
-    { id: 'loving', name: 'Loving & Compassionate', icon: 'heart' },
-    { id: 'confident', name: 'Confident & Bold', icon: 'star' },
-  ];
-
-  const lengthOptions = [
-    { id: 'short', name: 'Short (1-2 min)', description: 'Quick affirmation' },
-    { id: 'medium', name: 'Medium (3-5 min)', description: 'Standard length' },
-    { id: 'long', name: 'Long (5-8 min)', description: 'Deep meditation' },
-  ];
-
-  const samplePrompts = [
-    'Help me sleep peacefully and wake up refreshed',
-    'Build my confidence for an important presentation',
-    'Release stress and anxiety from my day',
-    'Cultivate self-love and acceptance',
-    'Manifest abundance and success',
-    'Heal from past trauma and find peace',
-  ];
+  const { addAffirmation } = useAffirmationStore();
+  const { settings } = useSettingsStore();
 
   if (!fontsLoaded) {
     return null;
   }
 
-  const generateAffirmation = async () => {
-    if (!prompt.trim()) {
-      Alert.alert('Missing Prompt', 'Please enter what you&apos;d like your affirmation to focus on.');
+  const handleQuickGenerate = async (prompt: typeof QUICK_PROMPTS[0]) => {
+    if (!settings.openRouterApiKey || !settings.elevenLabsApiKey) {
+      Alert.alert(
+        'API Keys Required',
+        'Please configure your OpenRouter and ElevenLabs API keys in Settings before generating affirmations.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Go to Settings', onPress: () => router.push('/settings') },
+        ]
+      );
+      return;
+    }
+
+    setSelectedPrompt(prompt.id);
+    setIsGenerating(true);
+
+    try {
+      // Check ElevenLabs quota
+      const quota = await apiService.checkQuota();
+      if (quota.remaining < settings.elevenLabsQuotaThreshold) {
+        Alert.alert(
+          'Low Quota Warning',
+          `You have ${quota.remaining} characters remaining in your ElevenLabs quota. Continue anyway?`,
+          [
+            { text: 'Cancel', style: 'cancel', onPress: () => {
+              setIsGenerating(false);
+              setSelectedPrompt(null);
+            }},
+            { text: 'Continue', onPress: () => proceedWithGeneration(prompt) },
+          ]
+        );
+        return;
+      }
+
+      await proceedWithGeneration(prompt);
+    } catch (error) {
+      console.error('Generation error:', error);
+      Alert.alert('Error', 'Failed to generate affirmations. Please try again.');
+      setIsGenerating(false);
+      setSelectedPrompt(null);
+    }
+  };
+
+  const handleCustomGenerate = async () => {
+    if (!customPrompt.trim()) {
+      Alert.alert('Error', 'Please enter a custom prompt.');
+      return;
+    }
+
+    if (!settings.openRouterApiKey || !settings.elevenLabsApiKey) {
+      Alert.alert(
+        'API Keys Required',
+        'Please configure your OpenRouter and ElevenLabs API keys in Settings before generating affirmations.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Go to Settings', onPress: () => router.push('/settings') },
+        ]
+      );
       return;
     }
 
     setIsGenerating(true);
-    console.log('Generating AI affirmation with:', { prompt, selectedTone, selectedLength });
 
-    // Simulate AI generation (in real app, this would call an AI API)
-    setTimeout(() => {
-      const mockGeneratedText = `I am calm and at peace. My mind is clear and focused. I release all worries and embrace tranquility. Every breath I take fills me with serenity. I am worthy of rest and relaxation. My body knows how to heal and restore itself. I trust in my ability to find peace within. Tonight, I sleep deeply and wake refreshed. I am grateful for this moment of stillness. Peace flows through every part of my being.`;
-      
-      setGeneratedText(mockGeneratedText);
+    try {
+      // Check ElevenLabs quota
+      const quota = await apiService.checkQuota();
+      if (quota.remaining < settings.elevenLabsQuotaThreshold) {
+        Alert.alert(
+          'Low Quota Warning',
+          `You have ${quota.remaining} characters remaining in your ElevenLabs quota. Continue anyway?`,
+          [
+            { text: 'Cancel', style: 'cancel', onPress: () => setIsGenerating(false) },
+            { text: 'Continue', onPress: () => proceedWithCustomGeneration() },
+          ]
+        );
+        return;
+      }
+
+      await proceedWithCustomGeneration();
+    } catch (error) {
+      console.error('Generation error:', error);
+      Alert.alert('Error', 'Failed to generate affirmations. Please try again.');
       setIsGenerating(false);
-      console.log('AI generation completed');
-    }, 3000);
+    }
   };
 
-  const saveAffirmation = () => {
-    if (!generatedText) return;
-    
-    console.log('Saving AI-generated affirmation');
-    Alert.alert(
-      'Affirmation Saved!',
-      'Your AI-generated affirmation has been saved to your library.',
-      [
-        {
-          text: 'Generate Another',
-          onPress: () => {
-            setGeneratedText('');
-            setPrompt('');
-          }
-        },
-        {
-          text: 'Go to Library',
-          onPress: () => router.push('/library')
-        }
-      ]
-    );
+  const proceedWithGeneration = async (prompt: typeof QUICK_PROMPTS[0]) => {
+    try {
+      // Generate affirmation texts
+      const response = await apiService.generateAffirmations({
+        intent: prompt.intent,
+        tone: prompt.tone,
+        count: 10,
+      });
+
+      // Create audio file
+      const audioFile = await audioService.createAffirmationAudio(
+        response.affirmations,
+        settings.defaultVoice,
+        settings.defaultLoopGap
+      );
+
+      // Create affirmation record
+      const affirmation = {
+        id: `affirmation_${Date.now()}`,
+        title: prompt.title,
+        date: new Date().toISOString(),
+        intent: prompt.intent,
+        tone: prompt.tone,
+        voice: settings.defaultVoice,
+        loopGap: settings.defaultLoopGap,
+        mp3Uri: audioFile.uri,
+        duration: `${Math.floor(audioFile.duration / 60)}:${(audioFile.duration % 60).toFixed(0).padStart(2, '0')}`,
+        plays: 0,
+        affirmationTexts: response.affirmations,
+      };
+
+      addAffirmation(affirmation);
+
+      Alert.alert(
+        'Success!',
+        'Your affirmations have been created successfully.',
+        [
+          { text: 'Create Another', onPress: () => {
+            setSelectedPrompt(null);
+            setCustomPrompt('');
+          }},
+          { text: 'Play Now', onPress: () => router.push(`/player?id=${affirmation.id}`) },
+        ]
+      );
+    } catch (error) {
+      console.error('Generation error:', error);
+      Alert.alert('Error', 'Failed to generate affirmations. Please try again.');
+    } finally {
+      setIsGenerating(false);
+      setSelectedPrompt(null);
+    }
   };
 
-  console.log('AIGenerateScreen rendered');
+  const proceedWithCustomGeneration = async () => {
+    try {
+      // For custom prompts, we'll use a general approach
+      const response = await apiService.generateAffirmations({
+        intent: 'custom',
+        tone: 'neutral',
+        count: 10,
+      });
+
+      // Create audio file
+      const audioFile = await audioService.createAffirmationAudio(
+        response.affirmations,
+        settings.defaultVoice,
+        settings.defaultLoopGap
+      );
+
+      // Create affirmation record
+      const affirmation = {
+        id: `affirmation_${Date.now()}`,
+        title: 'Custom Affirmations',
+        date: new Date().toISOString(),
+        intent: 'custom',
+        tone: 'neutral',
+        voice: settings.defaultVoice,
+        loopGap: settings.defaultLoopGap,
+        mp3Uri: audioFile.uri,
+        duration: `${Math.floor(audioFile.duration / 60)}:${(audioFile.duration % 60).toFixed(0).padStart(2, '0')}`,
+        plays: 0,
+        affirmationTexts: response.affirmations,
+      };
+
+      addAffirmation(affirmation);
+
+      Alert.alert(
+        'Success!',
+        'Your custom affirmations have been created successfully.',
+        [
+          { text: 'Create Another', onPress: () => setCustomPrompt('') },
+          { text: 'Play Now', onPress: () => router.push(`/player?id=${affirmation.id}`) },
+        ]
+      );
+    } catch (error) {
+      console.error('Generation error:', error);
+      Alert.alert('Error', 'Failed to generate affirmations. Please try again.');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
 
   return (
     <View style={commonStyles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <Ionicons name="arrow-back" size={24} color={colors.text} />
+        </TouchableOpacity>
+        <Text style={[commonStyles.title, { fontFamily: 'Inter_700Bold' }]}>
+          AI Generate
+        </Text>
+        <View style={styles.placeholder} />
+      </View>
+
       <ScrollView style={commonStyles.content} showsVerticalScrollIndicator={false}>
-        {/* Header */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 20, marginBottom: 30 }}>
-          <TouchableOpacity
-            onPress={() => router.back()}
-            style={{ marginRight: 16 }}
-          >
-            <Ionicons name="arrow-back" size={24} color={colors.text} />
-          </TouchableOpacity>
-          <Text style={[commonStyles.title, { fontFamily: 'Inter_700Bold', flex: 1, textAlign: 'left' }]}>
-            AI Generate
-          </Text>
-        </View>
-
-        {/* Prompt Input */}
-        <View style={{ marginBottom: 24 }}>
-          <Text style={[commonStyles.text, { fontFamily: 'Inter_600SemiBold', marginBottom: 8 }]}>
-            What would you like your affirmation to focus on?
-          </Text>
-          <TextInput
-            style={[commonStyles.input, { fontFamily: 'Inter_400Regular', height: 100, textAlignVertical: 'top' }]}
-            placeholder="e.g., I want to feel more confident and peaceful before sleep..."
-            placeholderTextColor={colors.textMuted}
-            value={prompt}
-            onChangeText={setPrompt}
-            multiline
-          />
-        </View>
-
-        {/* Sample Prompts */}
-        <View style={{ marginBottom: 24 }}>
-          <Text style={[commonStyles.text, { fontFamily: 'Inter_600SemiBold', marginBottom: 12 }]}>
-            Or try one of these:
-          </Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <View style={{ flexDirection: 'row', gap: 12, paddingRight: 20 }}>
-              {samplePrompts.map((samplePrompt, index) => (
-                <TouchableOpacity
-                  key={index}
-                  style={{
-                    backgroundColor: colors.surface,
-                    paddingHorizontal: 16,
-                    paddingVertical: 12,
-                    borderRadius: 12,
-                    borderWidth: 1,
-                    borderColor: colors.border,
-                    maxWidth: 200,
-                  }}
-                  onPress={() => {
-                    console.log(`Selected sample prompt: ${samplePrompt}`);
-                    setPrompt(samplePrompt);
-                  }}
-                >
-                  <Text style={[commonStyles.textMuted, { fontFamily: 'Inter_400Regular', fontSize: 14 }]}>
-                    {samplePrompt}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </ScrollView>
-        </View>
-
-        {/* Tone Selection */}
-        <View style={{ marginBottom: 24 }}>
-          <Text style={[commonStyles.text, { fontFamily: 'Inter_600SemiBold', marginBottom: 12 }]}>
-            Choose a tone:
-          </Text>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
-            {toneOptions.map((tone) => (
-              <TouchableOpacity
-                key={tone.id}
-                style={[
-                  commonStyles.card,
-                  {
-                    flex: 1,
-                    minWidth: '45%',
-                    alignItems: 'center',
-                    paddingVertical: 16,
-                    borderColor: selectedTone === tone.id ? colors.primary : colors.border,
-                    borderWidth: 2,
-                  }
-                ]}
-                onPress={() => {
-                  console.log(`Selected tone: ${tone.name}`);
-                  setSelectedTone(tone.id);
-                }}
-              >
-                <Ionicons 
-                  name={tone.icon as any} 
-                  size={24} 
-                  color={selectedTone === tone.id ? colors.primary : colors.textSecondary} 
-                  style={{ marginBottom: 8 }}
-                />
-                <Text style={[
-                  commonStyles.textMuted, 
-                  { 
-                    fontFamily: 'Inter_400Regular',
-                    color: selectedTone === tone.id ? colors.primary : colors.textSecondary,
-                    textAlign: 'center',
-                    fontSize: 12,
-                  }
-                ]}>
-                  {tone.name}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
-        {/* Length Selection */}
-        <View style={{ marginBottom: 32 }}>
-          <Text style={[commonStyles.text, { fontFamily: 'Inter_600SemiBold', marginBottom: 12 }]}>
-            Affirmation length:
-          </Text>
-          {lengthOptions.map((length) => (
-            <TouchableOpacity
-              key={length.id}
-              style={[
-                commonStyles.card,
-                {
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  borderColor: selectedLength === length.id ? colors.primary : colors.border,
-                  borderWidth: 2,
-                  marginBottom: 8,
-                }
-              ]}
-              onPress={() => {
-                console.log(`Selected length: ${length.name}`);
-                setSelectedLength(length.id);
-              }}
-            >
-              <View>
-                <Text style={[
-                  commonStyles.text, 
-                  { 
-                    fontFamily: 'Inter_600SemiBold',
-                    color: selectedLength === length.id ? colors.primary : colors.text
-                  }
-                ]}>
-                  {length.name}
-                </Text>
-                <Text style={[
-                  commonStyles.textMuted, 
-                  { 
-                    fontFamily: 'Inter_400Regular',
-                    color: selectedLength === length.id ? colors.primary : colors.textMuted,
-                    fontSize: 12,
-                  }
-                ]}>
-                  {length.description}
-                </Text>
-              </View>
-              {selectedLength === length.id && (
-                <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
-              )}
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* Generate Button */}
-        <TouchableOpacity
-          style={[buttonStyles.primary, { marginBottom: 24, opacity: isGenerating ? 0.7 : 1 }]}
-          onPress={generateAffirmation}
-          disabled={isGenerating}
-        >
+        {/* Hero Section */}
+        <View style={styles.heroSection}>
           <LinearGradient
             colors={[colors.primary, colors.secondary]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={[buttonStyles.primary, { margin: 0 }]}
+            style={styles.heroGradient}
           >
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Ionicons 
-                name={isGenerating ? "hourglass" : "sparkles"} 
-                size={20} 
-                color={colors.text} 
-                style={{ marginRight: 8 }} 
-              />
-              <Text style={[commonStyles.text, { fontFamily: 'Inter_600SemiBold', color: colors.text }]}>
-                {isGenerating ? 'Generating...' : 'Generate Affirmation'}
-              </Text>
-            </View>
+            <Ionicons name="sparkles" size={40} color={colors.text} />
           </LinearGradient>
-        </TouchableOpacity>
+          <Text style={[commonStyles.title, { fontFamily: 'Inter_700Bold', marginTop: 16 }]}>
+            AI-Powered Affirmations
+          </Text>
+          <Text style={[commonStyles.subtitle, { fontFamily: 'Inter_400Regular', textAlign: 'center' }]}>
+            Let AI create personalized affirmations based on your needs
+          </Text>
+        </View>
 
-        {/* Generated Result */}
-        {generatedText && (
-          <View style={{ marginBottom: 40 }}>
-            <Text style={[commonStyles.text, { fontFamily: 'Inter_600SemiBold', marginBottom: 12 }]}>
-              Generated Affirmation:
-            </Text>
-            <View style={[commonStyles.card, { borderColor: colors.primary, borderWidth: 2 }]}>
-              <Text style={[commonStyles.text, { fontFamily: 'Inter_400Regular', lineHeight: 24 }]}>
-                {generatedText}
-              </Text>
-            </View>
-            
-            <View style={{ flexDirection: 'row', gap: 12, marginTop: 16 }}>
-              <TouchableOpacity
-                style={[buttonStyles.secondary, { flex: 1 }]}
-                onPress={generateAffirmation}
-              >
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
-                  <Ionicons name="refresh" size={20} color={colors.textSecondary} style={{ marginRight: 8 }} />
-                  <Text style={[commonStyles.text, { fontFamily: 'Inter_600SemiBold', color: colors.textSecondary }]}>
-                    Regenerate
+        {/* Quick Prompts */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { fontFamily: 'Inter_600SemiBold' }]}>
+            Quick Generate
+          </Text>
+          <Text style={[styles.sectionSubtitle, { fontFamily: 'Inter_400Regular' }]}>
+            Choose from popular affirmation themes
+          </Text>
+
+          {QUICK_PROMPTS.map((prompt) => (
+            <TouchableOpacity
+              key={prompt.id}
+              style={[
+                styles.promptCard,
+                selectedPrompt === prompt.id && isGenerating && styles.generatingCard,
+              ]}
+              onPress={() => handleQuickGenerate(prompt)}
+              disabled={isGenerating}
+            >
+              <View style={styles.promptContent}>
+                <View style={styles.promptText}>
+                  <Text style={[styles.promptTitle, { fontFamily: 'Inter_600SemiBold' }]}>
+                    {prompt.title}
+                  </Text>
+                  <Text style={[styles.promptDescription, { fontFamily: 'Inter_400Regular' }]}>
+                    {prompt.prompt}
                   </Text>
                 </View>
-              </TouchableOpacity>
-              
-              <TouchableOpacity
-                style={[buttonStyles.primary, { flex: 1 }]}
-                onPress={saveAffirmation}
-              >
-                <LinearGradient
-                  colors={[colors.primary, colors.secondary]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={[buttonStyles.primary, { margin: 0 }]}
-                >
-                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
-                    <Ionicons name="save" size={20} color={colors.text} style={{ marginRight: 8 }} />
-                    <Text style={[commonStyles.text, { fontFamily: 'Inter_600SemiBold', color: colors.text }]}>
-                      Save
-                    </Text>
-                  </View>
-                </LinearGradient>
-              </TouchableOpacity>
+                {selectedPrompt === prompt.id && isGenerating ? (
+                  <ActivityIndicator size="small" color={colors.primary} />
+                ) : (
+                  <Ionicons name="arrow-forward" size={20} color={colors.textSecondary} />
+                )}
+              </View>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* Custom Prompt */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { fontFamily: 'Inter_600SemiBold' }]}>
+            Custom Prompt
+          </Text>
+          <Text style={[styles.sectionSubtitle, { fontFamily: 'Inter_400Regular' }]}>
+            Describe what you need affirmations for
+          </Text>
+
+          <TextInput
+            style={styles.customInput}
+            placeholder="e.g., I need help with public speaking confidence..."
+            placeholderTextColor={colors.textSecondary}
+            value={customPrompt}
+            onChangeText={setCustomPrompt}
+            multiline
+            numberOfLines={4}
+            textAlignVertical="top"
+          />
+
+          <TouchableOpacity
+            style={[
+              buttonStyles.primary,
+              (!customPrompt.trim() || isGenerating) && styles.disabledButton,
+            ]}
+            onPress={handleCustomGenerate}
+            disabled={!customPrompt.trim() || isGenerating}
+          >
+            <LinearGradient
+              colors={customPrompt.trim() && !isGenerating ? [colors.primary, colors.secondary] : [colors.surface, colors.surface]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={[buttonStyles.primary, { margin: 0 }]}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                {isGenerating && !selectedPrompt ? (
+                  <ActivityIndicator size="small" color={colors.text} style={{ marginRight: 8 }} />
+                ) : (
+                  <Ionicons name="sparkles" size={20} color={colors.text} style={{ marginRight: 8 }} />
+                )}
+                <Text style={[commonStyles.text, { fontFamily: 'Inter_600SemiBold', color: colors.text }]}>
+                  {isGenerating && !selectedPrompt ? 'Generating...' : 'Generate Custom Affirmations'}
+                </Text>
+              </View>
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
+
+        {/* Tips */}
+        <View style={styles.tipsSection}>
+          <Text style={[styles.sectionTitle, { fontFamily: 'Inter_600SemiBold' }]}>
+            Tips for Better Results
+          </Text>
+          <View style={styles.tipsList}>
+            <View style={styles.tipItem}>
+              <Ionicons name="bulb" size={16} color={colors.primary} />
+              <Text style={[styles.tipText, { fontFamily: 'Inter_400Regular' }]}>
+                Be specific about your goals and challenges
+              </Text>
+            </View>
+            <View style={styles.tipItem}>
+              <Ionicons name="heart" size={16} color={colors.primary} />
+              <Text style={[styles.tipText, { fontFamily: 'Inter_400Regular' }]}>
+                Focus on positive outcomes you want to achieve
+              </Text>
+            </View>
+            <View style={styles.tipItem}>
+              <Ionicons name="time" size={16} color={colors.primary} />
+              <Text style={[styles.tipText, { fontFamily: 'Inter_400Regular' }]}>
+                Mention when you plan to use the affirmations
+              </Text>
             </View>
           </View>
-        )}
+        </View>
       </ScrollView>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 10,
+  },
+  backButton: {
+    padding: 8,
+  },
+  placeholder: {
+    width: 40,
+  },
+  heroSection: {
+    alignItems: 'center',
+    paddingVertical: 32,
+    paddingHorizontal: 20,
+  },
+  heroGradient: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  section: {
+    paddingHorizontal: 20,
+    marginBottom: 32,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    color: colors.text,
+    marginBottom: 8,
+  },
+  sectionSubtitle: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    marginBottom: 20,
+  },
+  promptCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  generatingCard: {
+    borderColor: colors.primary,
+    backgroundColor: `${colors.primary}10`,
+  },
+  promptContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  promptText: {
+    flex: 1,
+    marginRight: 12,
+  },
+  promptTitle: {
+    fontSize: 16,
+    color: colors.text,
+    marginBottom: 4,
+  },
+  promptDescription: {
+    fontSize: 14,
+    color: colors.textSecondary,
+  },
+  customInput: {
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 16,
+    color: colors.text,
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginBottom: 20,
+    minHeight: 100,
+  },
+  disabledButton: {
+    opacity: 0.5,
+  },
+  tipsSection: {
+    paddingHorizontal: 20,
+    marginBottom: 40,
+  },
+  tipsList: {
+    marginTop: 16,
+  },
+  tipItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  tipText: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    marginLeft: 12,
+    flex: 1,
+  },
+});
+
