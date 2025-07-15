@@ -2,7 +2,7 @@ import { Audio, AudioMode, InterruptionModeIOS, InterruptionModeAndroid } from '
 import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system';
 import { encode } from 'base-64';
-import { apiService, TTSRequest } from './apiService';
+
 
 export interface AudioFile {
   uri: string;
@@ -47,87 +47,19 @@ class AudioService {
     };
   }
 
-  private arrayBufferToBase64(buffer: ArrayBuffer): string {
-    const bytes = new Uint8Array(buffer);
-    let binary = '';
-    const len = bytes.byteLength;
-    for (let i = 0; i < len; i++) {
-      const charCode = bytes[i];
-      if (charCode !== undefined) {
-        binary += String.fromCharCode(charCode);
-      }
-    }
-    return encode(binary);
-  }
 
-  private async getAudioDuration(uri: string | number): Promise<number> {
-    try {
-      const source = typeof uri === 'string' ? { uri } : uri;
-      const { sound, status } = await Audio.Sound.createAsync(source);
-      await sound.unloadAsync();
-      if (status.isLoaded && status.durationMillis) {
-        return status.durationMillis / 1000;
-      }
-      return 0;
-    } catch (error) {
-      console.error(`Failed to get duration for ${uri}:`, error);
-      return 0;
-    }
-  }
 
-  async createAffirmationAudio(
-    affirmations: string[],
-    voice: string,
-    loopGapMinutes: number
-  ): Promise<AudioFile> {
-    await this.initialize();
 
-    try {
-      const audioSegments: string[] = [];
-      for (const text of affirmations) {
-        const ttsRequest: TTSRequest = { text, voice };
-        const ttsResponse = await apiService.synthesizeSpeech(ttsRequest);
-        const base64Audio = this.arrayBufferToBase64(ttsResponse.audioData);
-        audioSegments.push(base64Audio);
-      }
 
-      if (audioSegments.length === 0) {
-        throw new Error('No audio could be generated.');
-      }
 
-      const finalBase64 = audioSegments[0];
-      const fileName = `affirmation_${Date.now()}.mp3`;
-      const docDir = FileSystem.documentDirectory;
-
-      if (!docDir) {
-        console.error('FileSystem.documentDirectory is null or undefined.');
-        throw new Error('Document directory is not available.');
-      }
-
-      const fileUri = `${docDir}${fileName}`;
-
-      await FileSystem.writeAsStringAsync(fileUri, finalBase64, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
-
-      const duration = await this.getAudioDuration(fileUri);
-      return {
-        uri: fileUri,
-        duration,
-      };
-    } catch (error) {
-      console.error('Failed to create affirmation audio:', error);
-      throw error;
-    }
-  }
   
-  async loadAffirmationAudio(uri: string): Promise<void> {
+  async loadAffirmationAudio(assetId: number): Promise<void> {
     await this.initialize();
     try {
       if (this.affirmationSound) {
         await this.affirmationSound.unloadAsync();
       }
-      const { sound } = await Audio.Sound.createAsync({ uri });
+      const { sound } = await Audio.Sound.createAsync(assetId);
       this.affirmationSound = sound;
     } catch (error) {
       console.error('Failed to load affirmation audio:', error);
@@ -135,15 +67,13 @@ class AudioService {
     }
   }
 
-  async loadBackingTrack(uri: string | number): Promise<void> {
+  async loadBackingTrack(assetId: number): Promise<void> {
     await this.initialize();
     try {
       if (this.backingTrackSound) {
         await this.backingTrackSound.unloadAsync();
       }
-      // Correctly handle local vs remote URIs
-      const source = typeof uri === 'number' ? uri : { uri };
-      const { sound } = await Audio.Sound.createAsync(source);
+      const { sound } = await Audio.Sound.createAsync(assetId);
       this.backingTrackSound = sound;
     } catch (error) {
       console.error('Failed to load backing track:', error);

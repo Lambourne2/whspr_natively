@@ -8,6 +8,7 @@ import {
   Alert,
   Switch,
   StyleSheet,
+  AlertButton,
 } from 'react-native';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -16,14 +17,9 @@ import { useFonts, Inter_400Regular, Inter_600SemiBold, Inter_700Bold } from '@e
 import { commonStyles, colors, buttonStyles } from '../styles/commonStyles';
 import { useSettingsStore } from '../store/settingsStore';
 import { useAffirmationStore } from '../store/affirmationStore';
-import { apiService } from '../services/apiService';
 
-const VOICE_OPTIONS = [
-  { id: 'soft_female', label: 'Soft Female', description: 'Gentle and nurturing voice' },
-  { id: 'calm_male', label: 'Calm Male', description: 'Deep and reassuring voice' },
-  { id: 'warm_female', label: 'Warm Female', description: 'Friendly and comforting voice' },
-  { id: 'gentle_male', label: 'Gentle Male', description: 'Soft and peaceful voice' },
-];
+
+
 
 const LOOP_GAP_OPTIONS = [5, 10, 15, 20, 30];
 
@@ -37,50 +33,20 @@ export default function SettingsScreen() {
   const { settings, updateSettings, resetSettings, clearCache } = useSettingsStore();
   const { affirmations } = useAffirmationStore();
 
-  const [openRouterKey, setOpenRouterKey] = useState(settings.openRouterApiKey);
-  const [elevenLabsKey, setElevenLabsKey] = useState(settings.elevenLabsApiKey);
-  const [isTestingKeys, setIsTestingKeys] = useState(false);
+
 
   if (!fontsLoaded) {
     return null;
   }
 
-  const handleSaveApiKeys = async () => {
-    if (!openRouterKey.trim() || !elevenLabsKey.trim()) {
-      Alert.alert('Error', 'Please enter both API keys.');
-      return;
-    }
 
-    setIsTestingKeys(true);
-
-    try {
-      // Test the keys by making a simple API call
-      updateSettings({
-        openRouterApiKey: openRouterKey.trim(),
-        elevenLabsApiKey: elevenLabsKey.trim(),
-      });
-
-      // Test ElevenLabs quota check
-      await apiService.checkQuota();
-
-      Alert.alert('Success', 'API keys saved and verified successfully!');
-    } catch (error) {
-      console.error('API key test error:', error);
-      Alert.alert(
-        'Warning',
-        'API keys saved but could not be verified. Please check your keys are correct.'
-      );
-    } finally {
-      setIsTestingKeys(false);
-    }
-  };
 
   const handleClearCache = () => {
     Alert.alert(
       'Clear Cache',
       'This will remove all cached audio files and temporary data. Your affirmations will remain but may need to be re-downloaded. Continue?',
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: 'Cancel', style: 'cancel', onPress: () => {} },
         {
           text: 'Clear',
           style: 'destructive',
@@ -98,19 +64,12 @@ export default function SettingsScreen() {
       'Reset Settings',
       'This will reset all settings to their default values. Your affirmations and API keys will be preserved. Continue?',
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: 'Cancel', style: 'cancel', onPress: () => {} },
         {
           text: 'Reset',
           style: 'destructive',
           onPress: () => {
-            const currentKeys = {
-              openRouterApiKey: settings.openRouterApiKey,
-              elevenLabsApiKey: settings.elevenLabsApiKey,
-            };
             resetSettings();
-            updateSettings(currentKeys);
-            setOpenRouterKey(currentKeys.openRouterApiKey);
-            setElevenLabsKey(currentKeys.elevenLabsApiKey);
             Alert.alert('Success', 'Settings reset to defaults.');
           },
         },
@@ -175,85 +134,13 @@ export default function SettingsScreen() {
       </View>
 
       <ScrollView style={commonStyles.content} showsVerticalScrollIndicator={false}>
-        {/* API Configuration */}
-        {renderSection(
-          'API Configuration',
-          <View>
-            <View style={styles.apiKeyContainer}>
-              <Text style={[styles.apiKeyLabel, { fontFamily: 'Inter_600SemiBold' }]}>
-                OpenRouter API Key
-              </Text>
-              <TextInput
-                style={styles.apiKeyInput}
-                placeholder="Enter your OpenRouter API key"
-                placeholderTextColor={colors.textSecondary}
-                value={openRouterKey}
-                onChangeText={setOpenRouterKey}
-                secureTextEntry
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-            </View>
 
-            <View style={styles.apiKeyContainer}>
-              <Text style={[styles.apiKeyLabel, { fontFamily: 'Inter_600SemiBold' }]}>
-                ElevenLabs API Key
-              </Text>
-              <TextInput
-                style={styles.apiKeyInput}
-                placeholder="Enter your ElevenLabs API key"
-                placeholderTextColor={colors.textSecondary}
-                value={elevenLabsKey}
-                onChangeText={setElevenLabsKey}
-                secureTextEntry
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-            </View>
-
-            <TouchableOpacity
-              style={[buttonStyles.primary, (isTestingKeys || (!openRouterKey.trim() || !elevenLabsKey.trim())) && styles.disabledButton]}
-              onPress={handleSaveApiKeys}
-              disabled={isTestingKeys || (!openRouterKey.trim() || !elevenLabsKey.trim())}
-            >
-              <LinearGradient
-                colors={!isTestingKeys && openRouterKey.trim() && elevenLabsKey.trim() ? [colors.primary, colors.secondary] : [colors.surface, colors.surface]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={[buttonStyles.primary, { margin: 0 }]}
-              >
-                <Text style={[commonStyles.text, { fontFamily: 'Inter_600SemiBold', color: colors.text }]}>
-                  {isTestingKeys ? 'Testing Keys...' : 'Save & Test API Keys'}
-                </Text>
-              </LinearGradient>
-            </TouchableOpacity>
-
-            <Text style={[styles.apiKeyHelp, { fontFamily: 'Inter_400Regular' }]}>
-              Get your API keys from OpenRouter.ai and ElevenLabs.io. These are required to generate affirmations.
-            </Text>
-          </View>
-        )}
 
         {/* Voice & Audio */}
         {renderSection(
           'Voice & Audio',
           <View>
-            {renderSettingItem(
-              'mic',
-              'Default Voice',
-              VOICE_OPTIONS.find(v => v.id === settings.defaultVoice)?.label,
-              <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />,
-              () => {
-                Alert.alert(
-                  'Select Default Voice',
-                  'Choose your preferred voice for new affirmations',
-                  VOICE_OPTIONS.map(voice => ({
-                    text: voice.label,
-                    onPress: () => updateSettings({ defaultVoice: voice.id }),
-                  })).concat([{ text: 'Cancel', style: 'cancel' }])
-                );
-              }
-            )}
+
 
             {renderSettingItem(
               'time',
@@ -264,10 +151,13 @@ export default function SettingsScreen() {
                 Alert.alert(
                   'Select Default Loop Gap',
                   'Time between affirmation repetitions',
-                  LOOP_GAP_OPTIONS.map(gap => ({
-                    text: `${gap} minutes`,
-                    onPress: () => updateSettings({ defaultLoopGap: gap }),
-                  })).concat([{ text: 'Cancel', style: 'cancel' }])
+                  LOOP_GAP_OPTIONS.map(
+                    (gap) =>
+                      ({
+                        text: `${gap} minutes`,
+                        onPress: () => updateSettings({ defaultLoopGap: gap }),
+                      } as AlertButton)
+                  ).concat([{ text: 'Cancel', style: 'cancel', onPress: () => {} }])
                 );
               }
             )}
@@ -281,10 +171,15 @@ export default function SettingsScreen() {
                 Alert.alert(
                   'Fade In Duration',
                   'How long audio takes to fade in',
-                  [1, 2, 3, 5, 10].map(duration => ({
-                    text: `${duration} seconds`,
-                    onPress: () => updateSettings({ fadeInDuration: duration }),
-                  })).concat([{ text: 'Cancel', style: 'cancel' }])
+                  [1, 2, 3, 5, 10]
+                    .map(
+                      (duration) =>
+                        ({
+                          text: `${duration} seconds`,
+                          onPress: () => updateSettings({ fadeInDuration: duration }),
+                        } as AlertButton)
+                    )
+                    .concat([{ text: 'Cancel', style: 'cancel', onPress: () => {} }])
                 );
               }
             )}
@@ -298,10 +193,15 @@ export default function SettingsScreen() {
                 Alert.alert(
                   'Fade Out Duration',
                   'How long audio takes to fade out',
-                  [1, 2, 3, 5, 10].map(duration => ({
-                    text: `${duration} seconds`,
-                    onPress: () => updateSettings({ fadeOutDuration: duration }),
-                  })).concat([{ text: 'Cancel', style: 'cancel' }])
+                  [1, 2, 3, 5, 10]
+                    .map(
+                      (duration) =>
+                        ({
+                          text: `${duration} seconds`,
+                          onPress: () => updateSettings({ fadeOutDuration: duration }),
+                        } as AlertButton)
+                    )
+                    .concat([{ text: 'Cancel', style: 'cancel', onPress: () => {} }])
                 );
               }
             )}
@@ -350,45 +250,7 @@ export default function SettingsScreen() {
           </View>
         )}
 
-        {/* Cost Control */}
-        {renderSection(
-          'Cost Control',
-          <View>
-            {renderSettingItem(
-              'warning',
-              'ElevenLabs Quota Threshold',
-              `Warn when below ${settings.elevenLabsQuotaThreshold} characters`,
-              <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />,
-              () => {
-                Alert.alert(
-                  'Quota Warning Threshold',
-                  'Get warned when your ElevenLabs quota is low',
-                  [500, 1000, 2000, 5000].map(threshold => ({
-                    text: `${threshold} characters`,
-                    onPress: () => updateSettings({ elevenLabsQuotaThreshold: threshold }),
-                  })).concat([{ text: 'Cancel', style: 'cancel' }])
-                );
-              }
-            )}
 
-            {renderSettingItem(
-              'speedometer',
-              'Max Concurrent TTS Calls',
-              `${settings.maxConcurrentTtsCalls} simultaneous requests`,
-              <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />,
-              () => {
-                Alert.alert(
-                  'Concurrent TTS Calls',
-                  'Maximum simultaneous text-to-speech requests',
-                  [1, 2, 3, 5].map(max => ({
-                    text: `${max} requests`,
-                    onPress: () => updateSettings({ maxConcurrentTtsCalls: max }),
-                  })).concat([{ text: 'Cancel', style: 'cancel' }])
-                );
-              }
-            )}
-          </View>
-        )}
 
         {/* Data & Storage */}
         {renderSection(

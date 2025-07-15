@@ -15,8 +15,10 @@ import Slider from '@react-native-community/slider';
 import { useFonts, Inter_400Regular, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
 import { commonStyles, colors } from '@/styles/commonStyles';
 import { useAffirmationStore, BackingTrack } from '@/store/affirmationStore';
+
 import { useSettingsStore } from '@/store/settingsStore';
 import { audioService } from '@/services/audioService';
+import { audioAssets } from '@/assets/audio/audioAssets';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -29,11 +31,10 @@ export default function PlayerScreen() {
 
   const { id } = useLocalSearchParams<{ id: string }>();
   const [isLoading, setIsLoading] = useState(false);
+  const [isPlaybackActive, setIsPlaybackActive] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-
   const [showBackingTracks, setShowBackingTracks] = useState(false);
-
   const progressInterval = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const {
@@ -41,7 +42,7 @@ export default function PlayerScreen() {
     backingTracks,
     currentAffirmation,
     currentBackingTrack,
-    isPlaying,
+
     isHydrated, // Get the hydration state
     affirmationVolume,
     backingTrackVolume,
@@ -50,12 +51,31 @@ export default function PlayerScreen() {
     setAffirmationVolume,
     setBackingTrackVolume,
     incrementPlays,
-    playCurrentAffirmation,
-    pause,
-    stop,
+
   } = useAffirmationStore();
 
   const { settings } = useSettingsStore();
+
+  const startProgressTracking = () => {
+    if (progressInterval.current) {
+      clearInterval(progressInterval.current);
+    }
+    progressInterval.current = setInterval(async () => {
+      const status = await audioService.getStatus();
+      if (status) {
+        setCurrentTime(status.currentTime);
+        setDuration(status.duration);
+        setIsPlaybackActive(status.isPlaying);
+        if (status.isFinished) {
+          if (progressInterval.current) {
+            clearInterval(progressInterval.current);
+          }
+          setCurrentTime(0);
+          setIsPlaybackActive(false);
+        }
+      }
+    }, 1000);
+  };
 
 
 
@@ -66,24 +86,33 @@ export default function PlayerScreen() {
         if (affirmation) {
           setIsLoading(true);
           setCurrentAffirmation(affirmation);
-          if (affirmation.duration && typeof affirmation.duration === 'string') {
-            const parts = affirmation.duration.split(':');
-            if (parts.length === 2 && parts[0] !== undefined && parts[1] !== undefined) {
-              const minutes = parseInt(parts[0], 10);
-              const seconds = parseInt(parts[1], 10);
-              if (!isNaN(minutes) && !isNaN(seconds)) {
-                setDuration(minutes * 60 + seconds);
-              }
+          try {
+            const audioSource = audioAssets[affirmation.audioUri]?.asset;
+            if (!audioSource) {
+              Alert.alert('Error', 'Could not find the selected audio track.');
+              setIsLoading(false);
+              return;
             }
+
+            await audioService.loadAffirmationAudio(audioSource);
+            await audioService.play(affirmationVolume, backingTrackVolume, settings.fadeInDuration);
+            setIsPlaybackActive(true);
+            const status = await audioService.getStatus();
+            if (status) {
+              setDuration(status.duration);
+            }
+            startProgressTracking();
+          } catch (error) {
+            console.error('Failed to play affirmation:', error);
+            Alert.alert('Error', 'Could not play the selected audio track.');
           }
-          await audioService.loadAffirmationAudio(affirmation.audioUri);
-          await playCurrentAffirmation();
+
           setIsLoading(false);
         }
       }
     };
     loadInitialAffirmation();
-  }, [id, affirmations, setCurrentAffirmation, playCurrentAffirmation]);
+  }, [id, affirmations, setCurrentAffirmation, settings.fadeInDuration]);
 
   useEffect(() => {
     return () => {
@@ -91,9 +120,9 @@ export default function PlayerScreen() {
         clearInterval(progressInterval.current);
       }
       // Call stop to ensure fade-out and cleanup
-      stop();
+      audioService.stop(settings.fadeOutDuration);
     };
-  }, []);
+  }, [settings.fadeOutDuration]);
 
   if (!fontsLoaded || !isHydrated) {
     return (
@@ -115,37 +144,19 @@ export default function PlayerScreen() {
   }
 
   const handlePlayPause = async () => {
-    if (isPlaying) {
-      pause();
+    if (isPlaybackActive) {
+      await audioService.pause();
+      setIsPlaybackActive(false);
     } else {
-      playCurrentAffirmation();
+      await audioService.play(affirmationVolume, backingTrackVolume, settings.fadeInDuration);
+      setIsPlaybackActive(true);
     }
   };
 
   const handleStop = async () => {
-    await stop();
-    setCurrentTime(0);
-  };
-
-  const startProgressTracking = () => {
-    if (progressInterval.current) {
-      clearInterval(progressInterval.current);
-    }
-
-    progressInterval.current = setInterval(async () => {
-      const status = await audioService.getStatus();
-      if (status) {
-        setCurrentTime(status.currentTime);
-        setDuration(status.duration);
-        if (status.isFinished) {
-          useAffirmationStore.getState().setIsPlaying(false);
-          if (progressInterval.current) {
-            clearInterval(progressInterval.current);
-            progressInterval.current = null;
-          }
-        }
-      }
-    }, 1000);
+    await audioService.stop(settings.fadeOutDuration);
+    setIsPlaybackActive(false);
+    router.back();
   };
 
   const handleAffirmationVolumeChange = async (volume: number) => {
@@ -291,7 +302,7 @@ export default function PlayerScreen() {
         </View>
 
         {/* Next Affirmation Timer */}
-        {isPlaying && (
+        {isPlaybackActive && (
           <View style={styles.nextAffirmationTimer}>
             <Text style={[styles.timerLabel, { fontFamily: 'Inter_400Regular' }]}>
               Next affirmation in:
@@ -307,9 +318,9 @@ export default function PlayerScreen() {
           <TouchableOpacity
             style={styles.controlButton}
             onPress={handleStop}
-            disabled={!isPlaying}
+            disabled={!isPlaybackActive}
           >
-            <Ionicons name="stop" size={32} color={!isPlaying ? colors.textSecondary : colors.text} />
+            <Ionicons name="stop" size={32} color={!isPlaybackActive ? colors.textSecondary : colors.text} />
           </TouchableOpacity>
           
           <TouchableOpacity
@@ -324,7 +335,7 @@ export default function PlayerScreen() {
               style={styles.playButtonGradient}
             >
               <Ionicons
-                name={isPlaying ? 'pause' : 'play'}
+                name={isPlaybackActive ? 'pause' : 'play'}
                 size={40}
                 color={colors.text}
               />
