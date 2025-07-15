@@ -98,14 +98,14 @@ export default function HomeScreen() {
           <TouchableOpacity
             style={buttonStyles.secondary}
             onPress={() => {
-              console.log('Navigate to affirmation player');
+              console.log('Navigate to sample tracks');
               router.push('/affirmation-player');
             }}
           >
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <Ionicons name="library" size={24} color={colors.textSecondary} style={{ marginRight: 8 }} />
               <Text style={[commonStyles.text, { fontFamily: 'Inter_600SemiBold', color: colors.textSecondary }]}>
-                Affirmation Player
+                Sample Tracks
               </Text>
             </View>
           </TouchableOpacity>

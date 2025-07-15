@@ -164,11 +164,6 @@ export default function PlayerScreen() {
     await audioService.setAffirmationVolume(volume);
   };
 
-  const handleBackingTrackVolumeChange = async (volume: number) => {
-    setBackingTrackVolume(volume);
-    await audioService.setBackingTrackVolume(volume);
-  };
-
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
@@ -351,40 +346,22 @@ export default function PlayerScreen() {
         <View style={styles.volumeControls}>
           <View style={styles.volumeControl}>
             <View style={styles.volumeHeader}>
-              <Ionicons name="mic" size={20} color={colors.primary} />
+              <Ionicons name="musical-notes-outline" size={20} color={colors.textSecondary} />
               <Text style={[styles.volumeLabel, { fontFamily: 'Inter_600SemiBold' }]}>
-                Affirmations
+                Backing Track
               </Text>
             </View>
             <Slider
-              style={{ width: '100%', height: 40 }}
+              style={styles.volumeSlider}
               minimumValue={0}
               maximumValue={1}
               value={affirmationVolume}
               onValueChange={handleAffirmationVolumeChange}
               minimumTrackTintColor={colors.primary}
               maximumTrackTintColor={colors.border}
+              thumbTintColor={colors.primary}
             />
             <Text style={styles.volumeValue}>{Math.round(affirmationVolume * 100)}%</Text>
-          </View>
-
-          <View style={styles.volumeControl}>
-            <View style={styles.volumeHeader}>
-              <Ionicons name="musical-notes" size={20} color={colors.secondary} />
-              <Text style={[styles.volumeLabel, { fontFamily: 'Inter_600SemiBold' }]}>
-                Backing Track
-              </Text>
-            </View>
-            <Slider
-              style={{ width: '100%', height: 40 }}
-              minimumValue={0}
-              maximumValue={1}
-              value={backingTrackVolume}
-              onValueChange={handleBackingTrackVolumeChange}
-              minimumTrackTintColor={colors.primary}
-              maximumTrackTintColor={colors.border}
-            />
-            <Text style={styles.volumeValue}>{Math.round(backingTrackVolume * 100)}%</Text>
           </View>
         </View>
 
