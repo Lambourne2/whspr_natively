@@ -76,6 +76,7 @@ export default function PlayerScreen() {
               }
             }
           }
+          await audioService.loadAffirmationAudio(affirmation.audioUri);
           await playCurrentAffirmation();
           setIsLoading(false);
         }
@@ -89,7 +90,8 @@ export default function PlayerScreen() {
       if (progressInterval.current) {
         clearInterval(progressInterval.current);
       }
-      audioService.cleanup();
+      // Call stop to ensure fade-out and cleanup
+      stop();
     };
   }, []);
 

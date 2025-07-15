@@ -178,6 +178,7 @@ class ApiService {
             style: 0.0,
             use_speaker_boost: true,
           },
+          output_format: 'pcm_24000',
         }),
       },
       'arraybuffer'

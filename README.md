@@ -38,7 +38,7 @@ Whspr is a revolutionary mobile application that combines the power of artificia
 
 ### Prerequisites
 
-- Node.js 18+ and npm
+- Node.js 18+ and npm (or pnpm)
 - Expo CLI (`npm install -g @expo/cli`)
 - iOS Simulator (for iOS development)
 - Android Studio and Android SDK (for Android development)
@@ -66,7 +66,7 @@ Whspr is a revolutionary mobile application that combines the power of artificia
 
 4. **Start the development server**
    ```bash
-   npm start
+   npm run dev
    ```
 
 5. **Run on your preferred platform**

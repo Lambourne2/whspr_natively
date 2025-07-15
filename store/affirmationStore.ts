@@ -11,7 +11,7 @@ export interface Affirmation {
   tone: string;
   voice: string;
   loopGap: number;
-  mp3Uri: string;
+  audioUri: string;
   duration?: string;
   plays: number;
   affirmationTexts: string[];
@@ -167,7 +167,7 @@ export const useAffirmationStore = create<AffirmationStore>()(
         const { currentAffirmation, currentBackingTrack, affirmationVolume, backingTrackVolume } = get();
         if (currentAffirmation) {
           try {
-            await audioService.loadAffirmationAudio(currentAffirmation.mp3Uri);
+            await audioService.loadAffirmationAudio(currentAffirmation.audioUri);
             if (currentBackingTrack) {
               await audioService.loadBackingTrack(currentBackingTrack.uri);
             }

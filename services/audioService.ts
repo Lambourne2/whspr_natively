@@ -1,6 +1,7 @@
 import { Audio, AudioMode, InterruptionModeIOS, InterruptionModeAndroid } from 'expo-av';
 import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system';
+import { encode } from 'base-64';
 import { apiService, TTSRequest } from './apiService';
 
 export interface AudioFile {
@@ -49,6 +50,34 @@ class AudioService {
     };
   }
 
+  private arrayBufferToBase64(buffer: ArrayBuffer): string {
+    const bytes = new Uint8Array(buffer);
+    let binary = "";
+    for (let i = 0; i < bytes.byteLength; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    return encode(binary);
+  }
+
+  private async getAudioDuration(uri: string | number): Promise<number> {
+    try {
+      const source = typeof uri === 'string' ? { uri } : uri;
+      const { sound, status } = await Audio.Sound.createAsync(source);
+
+      await sound.unloadAsync();
+
+      if (status.isLoaded && status.durationMillis) {
+        return status.durationMillis / 1000;
+      }
+
+      return 0;
+    } catch (error) {
+      console.error(`Failed to get duration for ${uri}:`, error);
+      return 0;
+    }
+  }
+
+
   async createAffirmationAudio(
     affirmations: string[],
     voice: string,
@@ -70,7 +99,7 @@ class AudioService {
       const finalAudio = ttsResponse.audioData;
 
       // Save to file system
-      const fileName = `affirmation_${Date.now()}.mp3`;
+      const fileName = `affirmation_${Date.now()}.wav`;
       const fileUri = `${FileSystem.documentDirectory}${fileName}`;
 
       // Convert ArrayBuffer to base64 to save with expo-file-system
@@ -80,68 +109,29 @@ class AudioService {
       });
 
       // Get audio duration
-      const duration = await this.getAudioDuration(fileUri);
-
-      return {
+      const duration = await this.getAudioDuration(fileUri); return {
         uri: fileUri,
         duration,
       };
     } catch (error) {
-      console.error('Failed to create affirmation audio:', error);
+      console.error("Failed to create affirmation audio:", error);
       throw error;
     }
   }
 
-  private arrayBufferToBase64(buffer: ArrayBuffer): string {
-    const bytes = new Uint8Array(buffer);
-    let binary = '';
-    for (let i = 0; i < bytes.byteLength; i++) {
-      binary += String.fromCharCode(bytes[i]);
-    }
-    return btoa(binary);
-  }
-
-  private async getAudioDuration(uri: string | number): Promise<number> {
-    try {
-      const source = typeof uri === 'string' ? { uri } : uri;
-      const { sound, status } = await Audio.Sound.createAsync(source);
-
-      const duration = (status.isLoaded && status.durationMillis) ? status.durationMillis : 0;
-
-      await sound.unloadAsync();
-      return duration / 1000;
-    } catch (error) {
-      console.error(`Failed to get duration for ${uri}:`, error);
-      return 0;
-    }
-  }
-
-  async loadAffirmationAudio(uri: string | number): Promise<void> {
+  async loadAffirmationAudio(uri: string): Promise<void> {
     await this.initialize();
-    
+
     try {
       if (this.affirmationSound) {
         await this.affirmationSound.unloadAsync();
       }
 
-      const source = typeof uri === 'string' ? { uri } : uri;
-      const { sound } = await Audio.Sound.createAsync(source);
+      const { sound } = await Audio.Sound.createAsync({ uri });
       this.affirmationSound = sound;
     } catch (error) {
       console.error('Failed to load affirmation audio:', error);
       throw error;
-    }
-  }
-
-  async unloadBackingTrack(): Promise<void> {
-    try {
-      if (this.backingTrackSound) {
-        await this.backingTrackSound.stopAsync();
-        await this.backingTrackSound.unloadAsync();
-        this.backingTrackSound = null;
-      }
-    } catch (error) {
-      console.error('Failed to unload backing track:', error);
     }
   }
 
@@ -159,6 +149,13 @@ class AudioService {
     } catch (error) {
       console.error('Failed to load backing track:', error);
       throw error;
+    }
+  }
+
+  async unloadBackingTrack(): Promise<void> {
+    if (this.backingTrackSound) {
+      await this.backingTrackSound.unloadAsync();
+      this.backingTrackSound = null;
     }
   }
 
@@ -197,7 +194,7 @@ class AudioService {
         await this.fadeIn(affirmationVolume, backingTrackVolume, fadeInDuration);
       }
     } catch (error) {
-      console.error('Failed to play audio:', error);
+      console.error("Failed to play audio:", error);
       throw error;
     }
   }
@@ -363,4 +360,16 @@ class AudioService {
 }
 
 export const audioService = AudioService.getInstance();
+
+
+
+
+
+
+
+
+
+
+
+
 

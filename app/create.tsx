@@ -174,7 +174,7 @@ export default function CreateScreen() {
         tone: formData.tone,
         voice: formData.voice,
         loopGap: formData.loopGap,
-        mp3Uri: audioFile.uri,
+        audioUri: audioFile.uri,
         duration: `${Math.floor(audioFile.duration / 60)}:${(audioFile.duration % 60).toFixed(0).padStart(2, '0')}`,
         plays: 0,
         affirmationTexts: response.affirmations,

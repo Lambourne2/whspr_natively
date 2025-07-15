@@ -14,11 +14,7 @@ export default function HomeScreen() {
     Inter_700Bold,
   });
 
-  const [recentAffirmations] = useState([
-    { id: 1, title: 'Morning Confidence', duration: '5:30', plays: 12 },
-    { id: 2, title: 'Sleep Deeply', duration: '8:45', plays: 8 },
-    { id: 3, title: 'Self Love', duration: '3:20', plays: 15 },
-  ]);
+
 
   if (!fontsLoaded) {
     return null;
@@ -96,49 +92,7 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Recent Affirmations */}
-        <View style={{ marginBottom: 30 }}>
-          <Text style={[commonStyles.subtitle, { fontFamily: 'Inter_600SemiBold', textAlign: 'left', marginBottom: 16 }]}>
-            Recent Affirmations
-          </Text>
-          
-          {recentAffirmations.map((affirmation) => (
-            <TouchableOpacity
-              key={affirmation.id}
-              style={commonStyles.card}
-              onPress={() => {
-                console.log(`Play affirmation: ${affirmation.title}`);
-                router.push(`/player?id=${affirmation.id}`);
-              }}
-            >
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                <View style={{ flex: 1 }}>
-                  <Text style={[commonStyles.text, { fontFamily: 'Inter_600SemiBold', marginBottom: 4 }]}>
-                    {affirmation.title}
-                  </Text>
-                  <Text style={[commonStyles.textMuted, { fontFamily: 'Inter_400Regular' }]}>
-                    {affirmation.duration} • {affirmation.plays} plays
-                  </Text>
-                </View>
-                <TouchableOpacity
-                  style={{
-                    backgroundColor: colors.primary,
-                    borderRadius: 20,
-                    width: 40,
-                    height: 40,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                  onPress={() => {
-                    console.log(`Quick play: ${affirmation.title}`);
-                  }}
-                >
-                  <Ionicons name="play" size={20} color={colors.text} />
-                </TouchableOpacity>
-              </View>
-            </TouchableOpacity>
-          ))}
-        </View>
+
 
         {/* Features */}
         <View style={{ marginBottom: 40 }}>
