@@ -28,7 +28,6 @@ class AudioService {
     try {
       const config = this.getAudioModeConfig();
       await Audio.setAudioModeAsync(config);
-      
       this.isInitialized = true;
     } catch (error) {
       console.error('Failed to initialize audio service:', error);
@@ -37,14 +36,12 @@ class AudioService {
   }
 
   private getAudioModeConfig(): AudioMode {
-    // The expo-av library is designed to safely ignore properties for other platforms.
-    // This approach ensures the type is always satisfied.
     return {
       staysActiveInBackground: true,
       allowsRecordingIOS: false,
-      interruptionModeIOS: InterruptionModeIOS.DoNotMix,
+      interruptionModeIOS: InterruptionModeIOS.MixWithOthers,
       playsInSilentModeIOS: true,
-      interruptionModeAndroid: InterruptionModeAndroid.DoNotMix,
+      interruptionModeAndroid: InterruptionModeAndroid.DuckOthers,
       shouldDuckAndroid: true,
       playThroughEarpieceAndroid: false,
     };
@@ -52,9 +49,13 @@ class AudioService {
 
   private arrayBufferToBase64(buffer: ArrayBuffer): string {
     const bytes = new Uint8Array(buffer);
-    let binary = "";
-    for (let i = 0; i < bytes.byteLength; i++) {
-      binary += String.fromCharCode(bytes[i]);
+    let binary = '';
+    const len = bytes.byteLength;
+    for (let i = 0; i < len; i++) {
+      const charCode = bytes[i];
+      if (charCode !== undefined) {
+        binary += String.fromCharCode(charCode);
+      }
     }
     return encode(binary);
   }
@@ -63,20 +64,16 @@ class AudioService {
     try {
       const source = typeof uri === 'string' ? { uri } : uri;
       const { sound, status } = await Audio.Sound.createAsync(source);
-
       await sound.unloadAsync();
-
       if (status.isLoaded && status.durationMillis) {
         return status.durationMillis / 1000;
       }
-
       return 0;
     } catch (error) {
       console.error(`Failed to get duration for ${uri}:`, error);
       return 0;
     }
   }
-
 
   async createAffirmationAudio(
     affirmations: string[],
@@ -85,48 +82,51 @@ class AudioService {
   ): Promise<AudioFile> {
     await this.initialize();
 
-    // Combine all affirmations into a single text with pauses.
-    // A simple period and space can create a natural pause with ElevenLabs.
-    const combinedText = affirmations.join('. ');
-
     try {
-      // Generate a single audio file for the combined text
-      const ttsRequest: TTSRequest = {
-        text: combinedText,
-        voice,
-      };
-      const ttsResponse = await apiService.synthesizeSpeech(ttsRequest);
-      const finalAudio = ttsResponse.audioData;
+      const audioSegments: string[] = [];
+      for (const text of affirmations) {
+        const ttsRequest: TTSRequest = { text, voice };
+        const ttsResponse = await apiService.synthesizeSpeech(ttsRequest);
+        const base64Audio = this.arrayBufferToBase64(ttsResponse.audioData);
+        audioSegments.push(base64Audio);
+      }
 
-      // Save to file system
-      const fileName = `affirmation_${Date.now()}.wav`;
-      const fileUri = `${FileSystem.documentDirectory}${fileName}`;
+      if (audioSegments.length === 0) {
+        throw new Error('No audio could be generated.');
+      }
 
-      // Convert ArrayBuffer to base64 to save with expo-file-system
-      const base64Audio = this.arrayBufferToBase64(finalAudio);
-      await FileSystem.writeAsStringAsync(fileUri, base64Audio, {
+      const finalBase64 = audioSegments[0];
+      const fileName = `affirmation_${Date.now()}.mp3`;
+      const docDir = FileSystem.documentDirectory;
+
+      if (!docDir) {
+        console.error('FileSystem.documentDirectory is null or undefined.');
+        throw new Error('Document directory is not available.');
+      }
+
+      const fileUri = `${docDir}${fileName}`;
+
+      await FileSystem.writeAsStringAsync(fileUri, finalBase64, {
         encoding: FileSystem.EncodingType.Base64,
       });
 
-      // Get audio duration
-      const duration = await this.getAudioDuration(fileUri); return {
+      const duration = await this.getAudioDuration(fileUri);
+      return {
         uri: fileUri,
         duration,
       };
     } catch (error) {
-      console.error("Failed to create affirmation audio:", error);
+      console.error('Failed to create affirmation audio:', error);
       throw error;
     }
   }
-
+  
   async loadAffirmationAudio(uri: string): Promise<void> {
     await this.initialize();
-
     try {
       if (this.affirmationSound) {
         await this.affirmationSound.unloadAsync();
       }
-
       const { sound } = await Audio.Sound.createAsync({ uri });
       this.affirmationSound = sound;
     } catch (error) {
@@ -137,13 +137,12 @@ class AudioService {
 
   async loadBackingTrack(uri: string | number): Promise<void> {
     await this.initialize();
-    
     try {
       if (this.backingTrackSound) {
         await this.backingTrackSound.unloadAsync();
       }
-
-      const source = typeof uri === 'string' ? { uri } : uri;
+      // Correctly handle local vs remote URIs
+      const source = typeof uri === 'number' ? uri : { uri };
       const { sound } = await Audio.Sound.createAsync(source);
       this.backingTrackSound = sound;
     } catch (error) {
@@ -164,37 +163,23 @@ class AudioService {
     backingTrackVolume: number = 0.6,
     fadeInDuration: number = 3000
   ): Promise<void> {
+    await this.initialize();
     try {
       const promises: Promise<any>[] = [];
-
       if (this.affirmationSound) {
-        promises.push(
-          this.affirmationSound.setVolumeAsync(affirmationVolume ?? 0.8).then(() =>
-            this.affirmationSound!.setIsLoopingAsync(true)
-          ).then(() =>
-            this.affirmationSound!.playAsync()
-          )
-        );
+        promises.push(this.affirmationSound.playAsync());
       }
-
       if (this.backingTrackSound) {
-        promises.push(
-          this.backingTrackSound.setVolumeAsync(backingTrackVolume ?? 0.6).then(() =>
-            this.backingTrackSound!.setIsLoopingAsync(true)
-          ).then(() =>
-            this.backingTrackSound!.playAsync()
-          )
-        );
+        promises.push(this.backingTrackSound.playAsync());
       }
-
       await Promise.all(promises);
-
-      // Implement fade-in effect
       if (fadeInDuration > 0) {
         await this.fadeIn(affirmationVolume, backingTrackVolume, fadeInDuration);
+      } else {
+        await this.setVolumes(affirmationVolume, backingTrackVolume);
       }
     } catch (error) {
-      console.error("Failed to play audio:", error);
+      console.error('Failed to play audio:', error);
       throw error;
     }
   }
@@ -202,15 +187,12 @@ class AudioService {
   async pause(): Promise<void> {
     try {
       const promises: Promise<any>[] = [];
-
       if (this.affirmationSound) {
         promises.push(this.affirmationSound.pauseAsync());
       }
-
       if (this.backingTrackSound) {
         promises.push(this.backingTrackSound.pauseAsync());
       }
-
       await Promise.all(promises);
     } catch (error) {
       console.error('Failed to pause audio:', error);
@@ -220,21 +202,16 @@ class AudioService {
 
   async stop(fadeOutDuration: number = 3000): Promise<void> {
     try {
-      // Implement fade-out effect
       if (fadeOutDuration > 0) {
         await this.fadeOut(fadeOutDuration);
       }
-
       const promises: Promise<any>[] = [];
-
       if (this.affirmationSound) {
         promises.push(this.affirmationSound.stopAsync());
       }
-
       if (this.backingTrackSound) {
         promises.push(this.backingTrackSound.stopAsync());
       }
-
       await Promise.all(promises);
     } catch (error) {
       console.error('Failed to stop audio:', error);
@@ -257,15 +234,12 @@ class AudioService {
   async setVolumes(affirmationVolume: number, backingTrackVolume: number): Promise<void> {
     try {
       const promises: Promise<any>[] = [];
-
       if (this.affirmationSound) {
         promises.push(this.affirmationSound.setVolumeAsync(affirmationVolume));
       }
-
       if (this.backingTrackSound) {
         promises.push(this.backingTrackSound.setVolumeAsync(backingTrackVolume));
       }
-
       await Promise.all(promises);
     } catch (error) {
       console.error('Failed to set volumes:', error);
@@ -282,13 +256,10 @@ class AudioService {
     if (!this.affirmationSound) {
       return null;
     }
-
     const status = await this.affirmationSound.getStatusAsync();
-
     if (!status.isLoaded) {
       return null;
     }
-
     return {
       currentTime: (status.positionMillis ?? 0) / 1000,
       duration: (status.durationMillis ?? 0) / 1000,
@@ -304,14 +275,12 @@ class AudioService {
   ): Promise<void> {
     const steps = 20;
     const stepDuration = duration / steps;
-    
     for (let i = 0; i <= steps; i++) {
       const progress = i / steps;
       const affirmationVolume = targetAffirmationVolume * progress;
       const backingTrackVolume = targetBackingTrackVolume * progress;
-      
       await this.setVolumes(affirmationVolume, backingTrackVolume);
-      await new Promise(resolve => setTimeout(resolve, stepDuration) as any);
+      await new Promise(resolve => setTimeout(resolve, stepDuration));
     }
   }
 
@@ -328,17 +297,15 @@ class AudioService {
       const status = await this.backingTrackSound.getStatusAsync();
       if (status.isLoaded) currentBackingTrackVolume = status.volume ?? 0;
     }
-    
+
     const steps = 20;
     const stepDuration = duration / steps;
-    
     for (let i = steps; i >= 0; i--) {
       const progress = i / steps;
       const affirmationVolume = currentAffirmationVolume * progress;
       const backingTrackVolume = currentBackingTrackVolume * progress;
-      
       await this.setVolumes(affirmationVolume, backingTrackVolume);
-      await new Promise(resolve => setTimeout(resolve, stepDuration) as any);
+      await new Promise(resolve => setTimeout(resolve, stepDuration));
     }
   }
 
@@ -348,7 +315,6 @@ class AudioService {
         await this.affirmationSound.unloadAsync();
         this.affirmationSound = null;
       }
-
       if (this.backingTrackSound) {
         await this.backingTrackSound.unloadAsync();
         this.backingTrackSound = null;

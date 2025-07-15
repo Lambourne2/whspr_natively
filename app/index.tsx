@@ -1,4 +1,4 @@
-import { Text, View, ScrollView, TouchableOpacity } from 'react-native';
+import { Text, View, ScrollView, TouchableOpacity, Image } from 'react-native';
 import { router } from 'expo-router';
 import { useState, useEffect } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -41,7 +41,11 @@ export default function HomeScreen() {
               justifyContent: 'center',
             }}
           >
-            <Ionicons name="moon" size={40} color={colors.text} />
+            <Image 
+              source={require('../assets/images/whspr_white (1).png')} 
+              style={{ width: 40, height: 40 }}
+              resizeMode="contain"
+            />
           </LinearGradient>
           
           <Text style={[commonStyles.title, { fontFamily: 'Inter_700Bold' }]}>
@@ -87,6 +91,21 @@ export default function HomeScreen() {
               <Ionicons name="library" size={24} color={colors.textSecondary} style={{ marginRight: 8 }} />
               <Text style={[commonStyles.text, { fontFamily: 'Inter_600SemiBold', color: colors.textSecondary }]}>
                 My Library
+              </Text>
+            </View>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={buttonStyles.secondary}
+            onPress={() => {
+              console.log('Navigate to affirmation player');
+              router.push('/affirmation-player');
+            }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Ionicons name="library" size={24} color={colors.textSecondary} style={{ marginRight: 8 }} />
+              <Text style={[commonStyles.text, { fontFamily: 'Inter_600SemiBold', color: colors.textSecondary }]}>
+                Affirmation Player
               </Text>
             </View>
           </TouchableOpacity>

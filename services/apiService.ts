@@ -56,7 +56,7 @@ class ApiService {
       if (!response.ok) {
         const errorBody = await response.text();
         console.error('API Error Response:', errorBody);
-        throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+        throw new Error(`API request failed: ${response.status} ${response.statusText} - ${errorBody}`);
       }
 
       if (responseType === 'arraybuffer') {

@@ -13,10 +13,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
 import { useFonts, Inter_400Regular, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
-import { commonStyles, colors } from '../styles/commonStyles';
-import { useAffirmationStore, BackingTrack } from '../store/affirmationStore';
-import { useSettingsStore } from '../store/settingsStore';
-import { audioService } from '../services/audioService';
+import { commonStyles, colors } from '@/styles/commonStyles';
+import { useAffirmationStore, BackingTrack } from '@/store/affirmationStore';
+import { useSettingsStore } from '@/store/settingsStore';
+import { audioService } from '@/services/audioService';
 
 const { width: screenWidth } = Dimensions.get('window');
 
