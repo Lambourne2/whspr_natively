@@ -48,7 +48,8 @@ export default function AffirmationPlayerScreen() {
     };
 
     addAffirmation(newAffirmation);
-    router.push(`/player?id=${newAffirmation.id}`);
+    // Redirect to the sample-tracks-player instead of the main player
+    router.push(`/sample-tracks-player?id=${newAffirmation.id}`);
   };
 
   return (

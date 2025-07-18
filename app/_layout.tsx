@@ -100,10 +100,10 @@ export default function RootLayout() {
 
           <Stack.Screen name="library" options={{ headerShown: false }} />
           <Stack.Screen name="player" options={{ headerShown: false }} />
+          <Stack.Screen name="sample-tracks-player" options={{ headerShown: false }} />
           <Stack.Screen name="settings" options={{ headerShown: false }} />
         </Stack>
       </SafeAreaView>
     </SafeAreaProvider>
   );
 }
-
