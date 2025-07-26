@@ -97,11 +97,14 @@ export default function RootLayout() {
         >
           <Stack.Screen name="index" options={{ headerShown: false }} />
           <Stack.Screen name="onboarding" options={{ headerShown: false }} />
-
           <Stack.Screen name="library" options={{ headerShown: false }} />
           <Stack.Screen name="player" options={{ headerShown: false }} />
           <Stack.Screen name="sample-tracks-player" options={{ headerShown: false }} />
           <Stack.Screen name="settings" options={{ headerShown: false }} />
+          <Stack.Screen name="create" options={{ headerShown: false }} />
+          <Stack.Screen name="ai-generate" options={{ headerShown: false }} />
+          <Stack.Screen name="voice-settings" options={{ headerShown: false }} />
+          <Stack.Screen name="affirmation-player" options={{ headerShown: false }} />
         </Stack>
       </SafeAreaView>
     </SafeAreaProvider>

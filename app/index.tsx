@@ -1,11 +1,16 @@
-import { Text, View, ScrollView, TouchableOpacity, Image } from 'react-native';
+import React from 'react';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  ScrollView,
+  StyleSheet,
+} from 'react-native';
 import { router } from 'expo-router';
-import { useState, useEffect } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useFonts, Inter_400Regular, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
-import { commonStyles, colors, buttonStyles } from '../styles/commonStyles';
-import Button from '../components/Button';
+import { commonStyles, colors } from '../styles/commonStyles';
 
 export default function HomeScreen() {
   const [fontsLoaded] = useFonts({
@@ -14,140 +19,204 @@ export default function HomeScreen() {
     Inter_700Bold,
   });
 
-
-
   if (!fontsLoaded) {
     return null;
   }
 
-  console.log('HomeScreen rendered');
-
   return (
     <View style={commonStyles.container}>
-      <ScrollView style={commonStyles.content} showsVerticalScrollIndicator={false}>
-        {/* Header */}
-        <View style={{ marginTop: 20, marginBottom: 30 }}>
+      <ScrollView 
+        style={commonStyles.content} 
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      >
+        <View style={styles.heroSection}>
           <LinearGradient
             colors={[colors.primary, colors.secondary]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={{
-              width: 80,
-              height: 80,
-              borderRadius: 40,
-              alignSelf: 'center',
-              marginBottom: 20,
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
+            style={styles.heroGradient}
           >
-            <Image 
-              source={require('../assets/images/whspr_white (1).png')} 
-              style={{ width: 40, height: 40 }}
-              resizeMode="contain"
-            />
+            <Ionicons name="moon" size={48} color={colors.text} />
           </LinearGradient>
           
-          <Text style={[commonStyles.title, { fontFamily: 'Inter_700Bold' }]}>
+          <Text style={[styles.title, { fontFamily: 'Inter_700Bold' }]}>
             Whspr
           </Text>
-          <Text style={[commonStyles.subtitle, { fontFamily: 'Inter_400Regular' }]}>
-            Custom affirmations for peaceful sleep
+          <Text style={[styles.subtitle, { fontFamily: 'Inter_400Regular' }]}>
+            Transform your sleep with personalized affirmations
           </Text>
         </View>
 
-        {/* Quick Actions */}
-        <View style={{ marginBottom: 30 }}>
-          <TouchableOpacity
-            style={[buttonStyles.primary, { marginBottom: 16 }]}
-            onPress={() => {
-              console.log('Navigate to create affirmation');
-              router.push('/create');
-            }}
+        <View style={styles.featureCards}>
+          <TouchableOpacity 
+            style={styles.featureCard} 
+            onPress={() => router.push('/create')}
           >
             <LinearGradient
-              colors={[colors.primary, colors.secondary]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={[buttonStyles.primary, { margin: 0 }]}
+              colors={[colors.primary + '20', colors.secondary + '20']}
+              style={styles.cardIcon}
             >
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Ionicons name="add-circle" size={24} color={colors.text} style={{ marginRight: 8 }} />
-                <Text style={[commonStyles.text, { fontFamily: 'Inter_600SemiBold', color: colors.text }]}>
-                  Create New Affirmation
-                </Text>
-              </View>
+              <Ionicons name="add-circle" size={32} color={colors.primary} />
             </LinearGradient>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={buttonStyles.secondary}
-            onPress={() => {
-              console.log('Navigate to library');
-              router.push('/library');
-            }}
-          >
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Ionicons name="library" size={24} color={colors.textSecondary} style={{ marginRight: 8 }} />
-              <Text style={[commonStyles.text, { fontFamily: 'Inter_600SemiBold', color: colors.textSecondary }]}>
-                My Library
+            <View style={styles.cardContent}>
+              <Text style={[styles.cardTitle, { fontFamily: 'Inter_600SemiBold' }]}>
+                Create
+              </Text>
+              <Text style={[styles.cardSubtitle, { fontFamily: 'Inter_400Regular' }]}>
+                Build custom affirmations
               </Text>
             </View>
+            <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={buttonStyles.secondary}
-            onPress={() => {
-              console.log('Navigate to sample tracks');
-              router.push('/affirmation-player');
-            }}
+          <TouchableOpacity 
+            style={styles.featureCard} 
+            onPress={() => router.push('/ai-generate')}
           >
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Ionicons name="library" size={24} color={colors.textSecondary} style={{ marginRight: 8 }} />
-              <Text style={[commonStyles.text, { fontFamily: 'Inter_600SemiBold', color: colors.textSecondary }]}>
-                Sample Tracks
-              </Text>
-            </View>
-          </TouchableOpacity>
-        </View>
-
-
-
-        {/* Features */}
-        <View style={{ marginBottom: 40 }}>
-          <Text style={[commonStyles.subtitle, { fontFamily: 'Inter_600SemiBold', textAlign: 'left', marginBottom: 16 }]}>
-            Features
-          </Text>
-          
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 }}>
-            <TouchableOpacity
-              style={[commonStyles.card, { flex: 1, marginRight: 8, alignItems: 'center' }]}
-              onPress={() => {
-                console.log('Navigate to AI generator');
-                router.push('/ai-generate');
-              }}
+            <LinearGradient
+              colors={[colors.primary + '20', colors.secondary + '20']}
+              style={styles.cardIcon}
             >
-              <Ionicons name="sparkles" size={32} color={colors.primary} style={{ marginBottom: 8 }} />
-              <Text style={[commonStyles.text, { fontFamily: 'Inter_600SemiBold', textAlign: 'center' }]}>
+              <Ionicons name="sparkles" size={32} color={colors.primary} />
+            </LinearGradient>
+            <View style={styles.cardContent}>
+              <Text style={[styles.cardTitle, { fontFamily: 'Inter_600SemiBold' }]}>
                 AI Generate
               </Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              style={[commonStyles.card, { flex: 1, marginLeft: 8, alignItems: 'center' }]}
-              onPress={() => {
-                console.log('Navigate to voice settings');
-                router.push('/voice-settings');
-              }}
-            >
-              <Ionicons name="mic" size={32} color={colors.secondary} style={{ marginBottom: 8 }} />
-              <Text style={[commonStyles.text, { fontFamily: 'Inter_600SemiBold', textAlign: 'center' }]}>
-                Voice Settings
+              <Text style={[styles.cardSubtitle, { fontFamily: 'Inter_400Regular' }]}>
+                Let AI create for you
               </Text>
-            </TouchableOpacity>
-          </View>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={styles.featureCard} 
+            onPress={() => router.push('/library')}
+          >
+            <LinearGradient
+              colors={[colors.primary + '20', colors.secondary + '20']}
+              style={styles.cardIcon}
+            >
+              <Ionicons name="library" size={32} color={colors.primary} />
+            </LinearGradient>
+            <View style={styles.cardContent}>
+              <Text style={[styles.cardTitle, { fontFamily: 'Inter_600SemiBold' }]}>
+                Library
+              </Text>
+              <Text style={[styles.cardSubtitle, { fontFamily: 'Inter_400Regular' }]}>
+                Your saved affirmations
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+          </TouchableOpacity>
         </View>
+
+        <TouchableOpacity 
+          style={styles.settingsButton}
+          onPress={() => router.push('/voice-settings')}
+        >
+          <Ionicons name="settings" size={24} color={colors.textSecondary} />
+          <Text style={[styles.settingsText, { fontFamily: 'Inter_500Medium' }]}>
+            Settings
+          </Text>
+        </TouchableOpacity>
       </ScrollView>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  scrollContent: {
+    paddingTop: 60,
+    paddingBottom: 40,
+    paddingHorizontal: 24,
+  },
+  heroSection: {
+    alignItems: 'center',
+    marginBottom: 48,
+  },
+  heroGradient: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 24,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  title: {
+    fontSize: 36,
+    color: colors.text,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  subtitle: {
+    fontSize: 18,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginBottom: 8,
+    lineHeight: 24,
+  },
+  featureCards: {
+    marginBottom: 32,
+  },
+  featureCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  cardIcon: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 16,
+  },
+  cardContent: {
+    flex: 1,
+  },
+  cardTitle: {
+    fontSize: 18,
+    color: colors.text,
+    marginBottom: 4,
+  },
+  cardSubtitle: {
+    fontSize: 14,
+    color: colors.textSecondary,
+  },
+  settingsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    backgroundColor: colors.surface,
+    borderRadius: 25,
+    alignSelf: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  settingsText: {
+    fontSize: 16,
+    color: colors.textSecondary,
+    marginLeft: 8,
+  },
+});
