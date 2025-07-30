@@ -13,7 +13,7 @@ import { useRouter } from 'expo-router';
 import { useAffirmationStore } from '@/store/affirmationStore';
 import { audioService } from '@/services/audioService';
 
-import { commonStyles, colors, buttonStyles } from '@/styles/commonStyles';
+import { commonStyles, colors, buttonStyles } from '../styles/commonStyles';
 import { Ionicons } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
 

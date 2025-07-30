@@ -13,7 +13,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
 import { useFonts, Inter_400Regular, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
-import { commonStyles, colors } from '@/styles/commonStyles';
+import { colors } from '../styles/commonStyles';
 import { useAffirmationStore } from '@/store/affirmationStore';
 
 import { useSettingsStore } from '@/store/settingsStore';
@@ -116,18 +116,18 @@ export default function SampleTracksPlayerScreen() {
 
   if (!fontsLoaded || !isHydrated) {
     return (
-      <View style={commonStyles.wrapperCentered}>
-        <Text style={commonStyles.text}>Loading Player...</Text>
+      <View style={styles.centeredContainer}>
+        <Text style={styles.loadingText}>Loading Player...</Text>
       </View>
     );
   }
 
   if (!currentAffirmation) {
     return (
-      <View style={commonStyles.wrapperCentered}>
-        <Text style={commonStyles.text}>No sample track selected.</Text>
+      <View style={styles.centeredContainer}>
+        <Text style={styles.errorText}>No sample track selected.</Text>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Text style={commonStyles.text}>Go Back</Text>
+          <Text style={styles.backButtonText}>Go Back</Text>
         </TouchableOpacity>
       </View>
     );
@@ -189,19 +189,19 @@ export default function SampleTracksPlayerScreen() {
   };
 
   return (
-    <View style={commonStyles.container}>
+    <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={[commonStyles.title, { fontFamily: 'Inter_700Bold' }]}>
+        <Text style={[styles.title, { fontFamily: 'Inter_700Bold' }]}>
           Sample Track
         </Text>
         <View style={styles.backButton}></View> {/* Empty view for spacing */}
       </View>
 
-      <ScrollView style={commonStyles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* Track Info */}
         <View style={styles.affirmationInfo}>
           <LinearGradient
@@ -295,6 +295,41 @@ export default function SampleTracksPlayerScreen() {
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  centeredContainer: {
+    flex: 1,
+    backgroundColor: colors.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: colors.text,
+    textAlign: 'center',
+  },
+  errorText: {
+    fontSize: 18,
+    color: colors.text,
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  backButtonText: {
+    fontSize: 16,
+    color: colors.primary,
+  },
+  scrollContent: {
+    flex: 1,
+  },
+  title: {
+    fontSize: 28,
+    color: colors.text,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',

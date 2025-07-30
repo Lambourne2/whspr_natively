@@ -7,15 +7,15 @@ import {
   Dimensions,
   Alert,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
 import { useFonts, Inter_400Regular, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
-import { commonStyles, colors } from '@/styles/commonStyles';
+import { colors } from '../styles/commonStyles';
 import { useAffirmationStore, BackingTrack } from '@/store/affirmationStore';
-
 import { useSettingsStore } from '@/store/settingsStore';
 import { audioService } from '@/services/audioService';
 import { audioAssets } from '@/assets/audio/audioAssets';
@@ -42,8 +42,7 @@ export default function PlayerScreen() {
     backingTracks,
     currentAffirmation,
     currentBackingTrack,
-
-    isHydrated, // Get the hydration state
+    isHydrated,
     affirmationVolume,
     backingTrackVolume,
     setCurrentAffirmation,
@@ -51,7 +50,6 @@ export default function PlayerScreen() {
     setAffirmationVolume,
     setBackingTrackVolume,
     incrementPlays,
-
   } = useAffirmationStore();
 
   const { settings } = useSettingsStore();
@@ -76,8 +74,6 @@ export default function PlayerScreen() {
       }
     }, 1000);
   };
-
-
 
   useEffect(() => {
     const loadInitialAffirmation = async () => {
@@ -106,7 +102,6 @@ export default function PlayerScreen() {
             console.error('Failed to play affirmation:', error);
             Alert.alert('Error', 'Could not play the selected audio track.');
           }
-
           setIsLoading(false);
         }
       }
@@ -119,25 +114,24 @@ export default function PlayerScreen() {
       if (progressInterval.current) {
         clearInterval(progressInterval.current);
       }
-      // Call stop to ensure fade-out and cleanup
       audioService.stop(settings.fadeOutDuration);
     };
   }, [settings.fadeOutDuration]);
 
   if (!fontsLoaded || !isHydrated) {
     return (
-      <View style={commonStyles.wrapperCentered}>
-        <Text style={commonStyles.text}>Loading Player...</Text>
+      <View style={styles.container}>
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
 
   if (!currentAffirmation) {
     return (
-      <View style={commonStyles.wrapperCentered}>
-        <Text style={commonStyles.text}>No affirmation selected.</Text>
+      <View style={styles.centeredContainer}>
+        <Text style={styles.errorText}>No affirmation selected.</Text>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Text style={commonStyles.text}>Go Back</Text>
+          <Text style={styles.backButtonText}>Go Back</Text>
         </TouchableOpacity>
       </View>
     );
@@ -270,75 +264,55 @@ export default function PlayerScreen() {
       <ScrollView style={commonStyles.content} showsVerticalScrollIndicator={false}>
         {/* Affirmation Info */}
         <View style={styles.affirmationInfo}>
-          <LinearGradient
-            colors={[colors.primary, colors.secondary]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.affirmationArt}
-          >
-            <Ionicons name="moon" size={60} color={colors.text} />
-          </LinearGradient>
-          
-          <Text style={[styles.affirmationTitle, { fontFamily: 'Inter_700Bold' }]}>
-            {currentAffirmation.title}
+          <Text style={styles.affirmationTitle} numberOfLines={2}>
+            {currentAffirmation?.title || 'Loading...'}
           </Text>
-          <Text style={[styles.affirmationMeta, { fontFamily: 'Inter_400Regular' }]}>
-            {currentAffirmation.intent} • {currentAffirmation.tone} • {currentAffirmation.plays} plays
-          </Text>
+          <View style={styles.affirmationMetaContainer}>
+            <View style={styles.metaTag}>
+              <Ionicons name="pricetag" size={14} color={colors.primary} />
+              <Text style={styles.metaText}>{currentAffirmation?.intent}</Text>
+            </View>
+            <View style={styles.metaTag}>
+              <Ionicons name="color-palette" size={14} color={colors.secondary} />
+              <Text style={styles.metaText}>{currentAffirmation?.tone}</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Progress Section */}
+        <View style={styles.progressSection}>
+          <View style={styles.progressContainer}>
+            <LinearGradient
+              colors={[colors.primary, colors.secondary]}
+              style={[styles.progressFill, { width: `${(currentTime / duration) * 100}%` }]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+            />
+            <View style={styles.progressBackground} />
+          </View>
+          <View style={styles.timeContainer}>
+            <Text style={styles.timeText}>{formatTime(currentTime)}</Text>
+            <Text style={styles.durationText}>{formatTime(duration)}</Text>
+          </View>
         </View>
 
         {/* Waveform */}
-        <View style={styles.waveformSection}>
-          {renderWaveform()}
-          <View style={styles.timeInfo}>
-            <Text style={styles.timeText}>{formatTime(currentTime)}</Text>
-            <Text style={styles.timeText}>{formatTime(duration)}</Text>
-          </View>
-        </View>
-
-        {/* Next Affirmation Timer */}
-        {isPlaybackActive && (
-          <View style={styles.nextAffirmationTimer}>
-            <Text style={[styles.timerLabel, { fontFamily: 'Inter_400Regular' }]}>
-              Next affirmation in:
-            </Text>
-            <Text style={[styles.timerValue, { fontFamily: 'Inter_700Bold' }]}>
-              {getNextAffirmationTime()}
-            </Text>
-          </View>
-        )}
+        {renderWaveform()}
 
         {/* Controls */}
         <View style={styles.controls}>
-          <TouchableOpacity
-            style={styles.controlButton}
-            onPress={handleStop}
-            disabled={!isPlaybackActive}
-          >
-            <Ionicons name="stop" size={32} color={!isPlaybackActive ? colors.textSecondary : colors.text} />
+          <TouchableOpacity style={styles.controlButton} onPress={handleStop}>
+            <Ionicons name="stop" size={24} color={colors.text} />
           </TouchableOpacity>
-          
-          <TouchableOpacity
-            style={[styles.playButton, isLoading && styles.disabledButton]}
-            onPress={handlePlayPause}
-            disabled={isLoading}
-          >
-            <LinearGradient
-              colors={[colors.primary, colors.secondary]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.playButtonGradient}
-            >
-              <Ionicons
-                name={isPlaybackActive ? 'pause' : 'play'}
-                size={40}
-                color={colors.text}
-              />
-            </LinearGradient>
+          <TouchableOpacity style={styles.playButton} onPress={handlePlayPause}>
+            {isPlaybackActive ? (
+              <Ionicons name="pause" size={48} color={colors.primary} />
+            ) : (
+              <Ionicons name="play" size={48} color={colors.primary} />
+            )}
           </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.controlButton}>
-            <Ionicons name="repeat" size={32} color={colors.text} />
+          <TouchableOpacity style={styles.controlButton} onPress={() => {}}>
+            <Ionicons name="repeat" size={24} color={colors.text} />
           </TouchableOpacity>
         </View>
 
@@ -346,10 +320,8 @@ export default function PlayerScreen() {
         <View style={styles.volumeControls}>
           <View style={styles.volumeControl}>
             <View style={styles.volumeHeader}>
-              <Ionicons name="musical-notes-outline" size={20} color={colors.textSecondary} />
-              <Text style={[styles.volumeLabel, { fontFamily: 'Inter_600SemiBold' }]}>
-                Backing Track
-              </Text>
+              <Ionicons name="volume-low" size={20} color={colors.text} />
+              <Text style={styles.volumeLabel}>Affirmation Volume</Text>
             </View>
             <Slider
               style={styles.volumeSlider}
@@ -357,136 +329,128 @@ export default function PlayerScreen() {
               maximumValue={1}
               value={affirmationVolume}
               onValueChange={handleAffirmationVolumeChange}
-              minimumTrackTintColor={colors.primary}
-              maximumTrackTintColor={colors.border}
-              thumbTintColor={colors.primary}
             />
             <Text style={styles.volumeValue}>{Math.round(affirmationVolume * 100)}%</Text>
+          </View>
+          <View style={styles.volumeControl}>
+            <View style={styles.volumeHeader}>
+              <Ionicons name="volume-low" size={20} color={colors.text} />
+              <Text style={styles.volumeLabel}>Backing Track Volume</Text>
+            </View>
+            <Slider
+              style={styles.volumeSlider}
+              minimumValue={0}
+              maximumValue={1}
+              value={backingTrackVolume}
+              onValueChange={(volume) => setBackingTrackVolume(volume)}
+            />
+            <Text style={styles.volumeValue}>{Math.round(backingTrackVolume * 100)}%</Text>
           </View>
         </View>
 
         {/* Backing Track Selector */}
         {showBackingTracks && renderBackingTrackSelector()}
-
-        {/* Affirmation Texts */}
-        <View style={styles.affirmationTexts}>
-          <Text style={[styles.sectionTitle, { fontFamily: 'Inter_600SemiBold' }]}>
-            Your Affirmations
-          </Text>
-          {currentAffirmation.affirmationTexts.map((text, index) => (
-            <View key={index} style={styles.affirmationTextCard}>
-              <Text style={[styles.affirmationText, { fontFamily: 'Inter_400Regular' }]}>
-                {text}
-              </Text>
-            </View>
-          ))}
-        </View>
       </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
   header: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 24,
-    paddingTop: 60,
-    paddingBottom: 20,
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
   backButton: {
-    padding: 8,
+    padding: 12,
   },
   trackButton: {
-    padding: 8,
+    padding: 12,
   },
   affirmationInfo: {
-    alignItems: 'center',
-    paddingVertical: 40,
-    paddingHorizontal: 24,
-  },
-  affirmationArt: {
-    width: 200,
-    height: 200,
-    borderRadius: 100,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 32,
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 10,
+    padding: 24,
   },
   affirmationTitle: {
-    fontSize: 28,
+    fontSize: 24,
     fontFamily: 'Inter_700Bold',
     color: colors.text,
-    textAlign: 'center',
-    marginBottom: 8,
-    lineHeight: 34,
   },
-  affirmationMeta: {
-    fontSize: 16,
+  affirmationMetaContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  metaTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  metaText: {
+    fontSize: 14,
     fontFamily: 'Inter_400Regular',
     color: colors.textSecondary,
-    textAlign: 'center',
+    marginLeft: 8,
   },
-  waveformSection: {
-    paddingHorizontal: 24,
-    marginBottom: 32,
+  progressSection: {
+    padding: 24,
   },
-  waveformContainer: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'space-between',
-    height: 80,
-    marginBottom: 16,
-    backgroundColor: colors.surface,
-    borderRadius: 16,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
+  progressContainer: {
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.border,
+    overflow: 'hidden',
   },
-  waveformBar: {
-    width: (screenWidth - 112) / 50,
-    borderRadius: 3,
-    marginHorizontal: 1,
+  progressFill: {
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.primary,
   },
-  timeInfo: {
+  progressBackground: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    bottom: 0,
+    right: 0,
+    backgroundColor: colors.border,
+  },
+  timeContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: 4,
+    alignItems: 'center',
+    marginTop: 12,
   },
   timeText: {
     fontSize: 14,
     fontFamily: 'Inter_500Medium',
     color: colors.textSecondary,
   },
-  nextAffirmationTimer: {
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    marginBottom: 24,
-  },
-  timerLabel: {
+  durationText: {
     fontSize: 14,
+    fontFamily: 'Inter_500Medium',
     color: colors.textSecondary,
-    marginBottom: 4,
   },
-  timerValue: {
-    fontSize: 20,
-    color: colors.primary,
+  waveformContainer: {
+    flexDirection: 'row',
+    padding: 24,
+  },
+  waveformBar: {
+    width: 2,
+    marginHorizontal: 1,
+    backgroundColor: colors.border,
   },
   controls: {
     flexDirection: 'row',
+    justifyContent: 'space-around',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 24,
-    marginBottom: 40,
+    padding: 24,
   },
   controlButton: {
     padding: 20,
@@ -494,24 +458,8 @@ const styles = StyleSheet.create({
   playButton: {
     marginHorizontal: 40,
   },
-  playButtonGradient: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 16,
-    elevation: 8,
-  },
-  disabledButton: {
-    opacity: 0.5,
-  },
   volumeControls: {
-    paddingHorizontal: 24,
-    marginBottom: 40,
+    padding: 24,
   },
   volumeControl: {
     marginBottom: 32,
@@ -547,8 +495,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   backingTrackSelector: {
-    paddingHorizontal: 24,
-    marginBottom: 40,
+    padding: 24,
   },
   sectionTitle: {
     fontSize: 20,
@@ -589,30 +536,25 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_400Regular',
     color: colors.textSecondary,
     textAlign: 'center',
-    marginTop: 6,
+    marginTop: 4,
   },
-  affirmationTexts: {
-    paddingHorizontal: 24,
-    marginBottom: 60,
-  },
-  affirmationTextCard: {
-    backgroundColor: colors.surface,
-    borderRadius: 16,
+  centeredContainer: {
+    flex: 1,
+    backgroundColor: colors.background,
+    alignItems: 'center',
+    justifyContent: 'center',
     padding: 20,
-    marginBottom: 16,
-    borderLeftWidth: 4,
-    borderLeftColor: colors.primary,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
   },
-  affirmationText: {
-    fontSize: 17,
+  errorText: {
+    fontSize: 18,
     fontFamily: 'Inter_400Regular',
     color: colors.text,
-    lineHeight: 26,
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  backButtonText: {
+    fontSize: 16,
+    fontFamily: 'Inter_600SemiBold',
+    color: colors.primary,
   },
 });
-
