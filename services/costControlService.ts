@@ -159,6 +159,14 @@ class CostControlService {
       // Check quota
       const quota = await apiService.checkQuota();
       
+      if (!quota) {
+        return {
+          canProceed: false,
+          reason: 'Unable to check quota',
+          suggestion: 'Please check your internet connection and try again.',
+        };
+      }
+      
       if (quota.remaining < estimatedCharacters) {
         return {
           canProceed: false,
@@ -176,13 +184,17 @@ class CostControlService {
         };
       }
 
-      return { canProceed: true };
-    } catch (error) {
-      console.error('Failed to check quota for request:', error);
       return {
-        canProceed: true, // Allow request but warn
-        reason: 'Could not verify quota',
-        suggestion: 'Proceeding without quota verification. Check your API key if issues persist.',
+        canProceed: true,
+        reason: 'Sufficient quota',
+        suggestion: `You have ${quota.remaining} characters remaining.`,
+      };
+    } catch (error) {
+      console.error('Error checking quota:', error);
+      return {
+        canProceed: false,
+        reason: 'Error checking quota',
+        suggestion: 'Please check your internet connection and try again.',
       };
     }
   }
@@ -226,7 +238,7 @@ class CostControlService {
     
     try {
       const quota = await apiService.checkQuota();
-      const quotaPercentage = (characterCount / quota.remaining) * 100;
+      const quotaPercentage = quota ? (characterCount / quota.remaining) * 100 : 0;
       
       return {
         characterCount,
@@ -236,7 +248,7 @@ class CostControlService {
     } catch (error) {
       return {
         characterCount,
-        estimatedCost,
+        estimatedCost: 0,
         quotaPercentage: 0,
       };
     }

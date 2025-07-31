@@ -3,8 +3,6 @@ import {
   View,
   Text,
   ScrollView,
-  TextInput,
-  TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
   Alert,
@@ -13,8 +11,11 @@ import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useFonts, Inter_400Regular, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
-import { commonStyles, colors, buttonStyles } from '../styles/commonStyles';
+import { commonStyles, colors } from '../styles/commonStyles';
 import Button from '../components/Button';
+import Input from '../components/Input';
+import Card from '../components/Card';
+import Header from '../components/Header';
 import { useAffirmationStore } from '../store/affirmationStore';
 import { generateAffirmation } from '../services/aiService';
 
@@ -77,10 +78,19 @@ export default function AIGenerateScreen() {
 
     setIsGenerating(true);
     try {
-      const previewTexts = generateAIPreviewText(selectedIntention, selectedPersonality, customContext);
-      setGeneratedPreview(previewTexts);
+      // Use real AI service instead of mock
+      const affirmationData = {
+        intention: selectedIntention,
+        tone: selectedPersonality,
+        voice: 'female-soft',
+        customText: customContext,
+      };
+
+      const generated = await generateAffirmation(affirmationData);
+      setGeneratedPreview(generated.texts);
     } catch (error) {
-      Alert.alert('Error', 'Failed to generate preview. Please try again.');
+      Alert.alert('Error', 'Failed to generate affirmation. Please try again.');
+      console.error('Generation error:', error);
     } finally {
       setIsGenerating(false);
     }
@@ -106,7 +116,7 @@ export default function AIGenerateScreen() {
       const newAffirmation = {
         id: Date.now().toString(),
         title: title.trim(),
-        date: new Date().toISOString().split('T')[0] || new Date().toISOString().split('T')[0],
+        date: new Date().toISOString().split('T')[0] || new Date().toISOString(),
         intent: selectedIntention,
         tone: selectedPersonality,
         voice: 'female-soft',
@@ -114,7 +124,7 @@ export default function AIGenerateScreen() {
         audioUri: generatedAffirmation.audioUri,
         duration: `${selectedDuration}:00`,
         plays: 0,
-        affirmationTexts: generatedPreview,
+        affirmationTexts: generatedAffirmation.texts,
       };
 
       addAffirmation(newAffirmation);
@@ -230,34 +240,16 @@ export default function AIGenerateScreen() {
     onSelect: (value: string) => void
   ) => (
     <View style={{ marginBottom: 24 }}>
-      <Text style={[commonStyles.subtitle, { textAlign: 'left', marginBottom: 12 }]}>
-        {title}
-      </Text>
+      <Text style={[commonStyles.subtitle, { textAlign: 'left', marginBottom: 12 }]}>{title}</Text>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
         {options.map((option) => (
-          <TouchableOpacity
+          <Button
             key={option}
-            style={[
-              commonStyles.card,
-              {
-                paddingVertical: 8,
-                paddingHorizontal: 16,
-                margin: 4,
-                backgroundColor: selected === option ? colors.primary : colors.surface,
-                borderColor: selected === option ? colors.primary : colors.border,
-              },
-            ]}
+            text={option}
             onPress={() => onSelect(option)}
-          >
-            <Text
-              style={[
-                commonStyles.text,
-                { fontSize: 14, color: selected === option ? colors.text : colors.textSecondary },
-              ]}
-            >
-              {option}
-            </Text>
-          </TouchableOpacity>
+            variant={selected === option ? 'primary' : 'secondary'}
+            style={{ margin: 4 }}
+          />
         ))}
       </View>
     </View>
@@ -265,34 +257,16 @@ export default function AIGenerateScreen() {
 
   const renderDurationSelector = () => (
     <View style={{ marginBottom: 24 }}>
-      <Text style={[commonStyles.subtitle, { textAlign: 'left', marginBottom: 12 }]}>
-        Duration
-      </Text>
+      <Text style={[commonStyles.subtitle, { textAlign: 'left', marginBottom: 12 }]}>Duration</Text>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
         {DURATION_OPTIONS.map((option) => (
-          <TouchableOpacity
+          <Button
             key={option.value}
-            style={[
-              commonStyles.card,
-              {
-                paddingVertical: 8,
-                paddingHorizontal: 16,
-                margin: 4,
-                backgroundColor: selectedDuration === option.value ? colors.primary : colors.surface,
-                borderColor: selectedDuration === option.value ? colors.primary : colors.border,
-              },
-            ]}
+            text={option.label}
             onPress={() => setSelectedDuration(option.value)}
-          >
-            <Text
-              style={[
-                commonStyles.text,
-                { fontSize: 14, color: selectedDuration === option.value ? colors.text : colors.textSecondary },
-              ]}
-            >
-              {option.label}
-            </Text>
-          </TouchableOpacity>
+            variant={selectedDuration === option.value ? 'primary' : 'secondary'}
+            style={{ margin: 4 }}
+          />
         ))}
       </View>
     </View>
@@ -305,28 +279,17 @@ export default function AIGenerateScreen() {
     >
       <ScrollView style={commonStyles.content} showsVerticalScrollIndicator={false}>
         <View style={{ paddingTop: 20 }}>
-          <TouchableOpacity
-            onPress={() => router.back()}
-            style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20 }}
-          >
-            <Ionicons name="arrow-back" size={24} color={colors.textSecondary} />
-            <Text style={[commonStyles.text, { marginLeft: 8 }]}>Back</Text>
-          </TouchableOpacity>
-
-          <Text style={[commonStyles.title, { marginBottom: 8 }]}>AI Generate</Text>
-          <Text style={[commonStyles.subtitle, { marginBottom: 30, textAlign: 'left' }]}>
-            Let AI create personalized affirmations for you
-          </Text>
+          <Header 
+            title="AI Generate" 
+            showBackButton 
+            onBackPress={() => router.back()}
+            subtitle="Let AI create personalized affirmations for you"
+          />
 
           {/* Title */}
           <View style={{ marginBottom: 24 }}>
-            <Text style={[commonStyles.subtitle, { textAlign: 'left', marginBottom: 12 }]}>
-              Title
-            </Text>
-            <TextInput
-              style={commonStyles.input}
+            <Input
               placeholder="Name your AI affirmation..."
-              placeholderTextColor={colors.textMuted}
               value={title}
               onChangeText={setTitle}
             />
@@ -343,16 +306,13 @@ export default function AIGenerateScreen() {
 
           {/* Custom Context */}
           <View style={{ marginBottom: 24 }}>
-            <Text style={[commonStyles.subtitle, { textAlign: 'left', marginBottom: 12 }]}>
-              Personal Context (Optional)
-            </Text>
-            <TextInput
-              style={[commonStyles.input, { minHeight: 80, textAlignVertical: 'top' }]}
+            <Text style={[commonStyles.subtitle, { textAlign: 'left', marginBottom: 12 }]}>Personal Context (Optional)</Text>
+            <Input
               placeholder="Share any specific situations, challenges, or goals you'd like the affirmations to address..."
-              placeholderTextColor={colors.textMuted}
               value={customContext}
               onChangeText={setCustomContext}
               multiline
+              style={{ minHeight: 80 }}
             />
           </View>
 
@@ -366,18 +326,14 @@ export default function AIGenerateScreen() {
           {/* Preview Section */}
           {generatedPreview.length > 0 && (
             <View style={{ marginTop: 24, marginBottom: 24 }}>
-              <Text style={[commonStyles.subtitle, { textAlign: 'left', marginBottom: 16 }]}>
-                Preview
-              </Text>
-              <View style={[commonStyles.card, { backgroundColor: colors.backgroundAlt }]}>
+              <Text style={[commonStyles.subtitle, { textAlign: 'left', marginBottom: 16 }]}>Preview</Text>
+              <Card>
                 {generatedPreview.map((text, index) => (
                   <View key={index} style={{ marginBottom: 12 }}>
-                    <Text style={[commonStyles.text, { fontStyle: 'italic' }]}>
-                      "{text}"
-                    </Text>
+                    <Text style={[commonStyles.text, { fontStyle: 'italic' }]}>"{text}"</Text>
                   </View>
                 ))}
-              </View>
+              </Card>
               
               <View style={{ marginTop: 16 }}>
                 <Button

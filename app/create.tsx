@@ -3,8 +3,6 @@ import {
   View,
   Text,
   ScrollView,
-  TextInput,
-  TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
   Alert,
@@ -13,8 +11,10 @@ import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useFonts, Inter_400Regular, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
-import { commonStyles, colors, buttonStyles } from '../styles/commonStyles';
+import { commonStyles, colors } from '../styles/commonStyles';
 import Button from '../components/Button';
+import Input from '../components/Input';
+import Header from '../components/Header';
 import { useAffirmationStore } from '../store/affirmationStore';
 import { generateAffirmation } from '../services/aiService';
 
@@ -81,7 +81,7 @@ export default function CreateAffirmationScreen() {
         intention: selectedIntention,
         tone: selectedTone,
         voice: selectedVoice,
-        customText: customText.trim() || undefined,
+        ...(customText.trim() && { customText: customText.trim() }),
       };
 
       const generatedAffirmation = await generateAffirmation(affirmationData);
@@ -89,7 +89,7 @@ export default function CreateAffirmationScreen() {
       const newAffirmation = {
         id: Date.now().toString(),
         title: title.trim(),
-        date: new Date().toISOString().split('T')[0] || new Date().toISOString().split('T')[0],
+        date: new Date().toISOString().split('T')[0] || new Date().toISOString(),
         intent: selectedIntention,
         tone: selectedTone,
         voice: selectedVoice,
@@ -119,34 +119,16 @@ export default function CreateAffirmationScreen() {
     onSelect: (value: string) => void
   ) => (
     <View style={{ marginBottom: 24 }}>
-      <Text style={[commonStyles.subtitle, { textAlign: 'left', marginBottom: 12 }] }>
-        {title}
-      </Text>
+      <Text style={[commonStyles.subtitle, { textAlign: 'left', marginBottom: 12 }] }>{title}</Text>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
         {options.map((option) => (
-          <TouchableOpacity
+          <Button
             key={option}
-            style={[
-              commonStyles.card,
-              {
-                paddingVertical: 8,
-                paddingHorizontal: 16,
-                margin: 4,
-                backgroundColor: selected === option ? colors.primary : colors.surface,
-                borderColor: selected === option ? colors.primary : colors.border,
-              },
-            ]}
+            text={option}
             onPress={() => onSelect(option)}
-          >
-            <Text
-              style={[
-                commonStyles.text,
-                { fontSize: 14, color: selected === option ? colors.text : colors.textSecondary },
-              ]}
-            >
-              {option}
-            </Text>
-          </TouchableOpacity>
+            variant={selected === option ? 'primary' : 'secondary'}
+            style={{ margin: 4 }}
+          />
         ))}
       </View>
     </View>
@@ -159,28 +141,17 @@ export default function CreateAffirmationScreen() {
     >
       <ScrollView style={commonStyles.content} showsVerticalScrollIndicator={false}>
         <View style={{ paddingTop: 20 }}>
-          <TouchableOpacity
-            onPress={() => router.back()}
-            style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20 }}
-          >
-            <Ionicons name="arrow-back" size={24} color={colors.textSecondary} />
-            <Text style={[commonStyles.text, { marginLeft: 8 }]}>Back</Text>
-          </TouchableOpacity>
-
-          <Text style={[commonStyles.title, { marginBottom: 8 }]}>Create Affirmation</Text>
-          <Text style={[commonStyles.subtitle, { marginBottom: 30, textAlign: 'left' }]}>
-            Customize your perfect sleep affirmation
-          </Text>
+          <Header 
+            title="Create Affirmation" 
+            showBackButton 
+            onBackPress={() => router.back()}
+            subtitle="Customize your perfect sleep affirmation"
+          />
 
           {/* Title */}
           <View style={{ marginBottom: 24 }}>
-            <Text style={[commonStyles.subtitle, { textAlign: 'left', marginBottom: 12 }]}>
-              Title
-            </Text>
-            <TextInput
-              style={commonStyles.input}
+            <Input
               placeholder="Give your affirmation a name..."
-              placeholderTextColor={colors.textMuted}
               value={title}
               onChangeText={setTitle}
             />
@@ -197,16 +168,14 @@ export default function CreateAffirmationScreen() {
 
           {/* Loop Gap */}
           <View style={{ marginBottom: 24 }}>
-            <Text style={[commonStyles.subtitle, { textAlign: 'left', marginBottom: 12 }]}>
-              Gap Between Repetitions: {loopGap}s
-            </Text>
+            <Text style={[commonStyles.subtitle, { textAlign: 'left', marginBottom: 12 }]}>Gap Between Repetitions: {loopGap}s</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <TouchableOpacity
+              <Button
+                text="-"
                 onPress={() => setLoopGap(Math.max(1, loopGap - 1))}
-                style={[commonStyles.card, { padding: 8, marginRight: 12 }]}
-              >
-                <Ionicons name="remove" size={20} color={colors.text} />
-              </TouchableOpacity>
+                variant="secondary"
+                style={{ padding: 8, marginRight: 12, minWidth: 40 }}
+              />
               <View style={{ flex: 1, height: 2, backgroundColor: colors.border }}>
                 <View
                   style={{
@@ -216,27 +185,24 @@ export default function CreateAffirmationScreen() {
                   }}
                 />
               </View>
-              <TouchableOpacity
+              <Button
+                text="+"
                 onPress={() => setLoopGap(Math.min(10, loopGap + 1))}
-                style={[commonStyles.card, { padding: 8, marginLeft: 12 }]}
-              >
-                <Ionicons name="add" size={20} color={colors.text} />
-              </TouchableOpacity>
+                variant="secondary"
+                style={{ padding: 8, marginLeft: 12, minWidth: 40 }}
+              />
             </View>
           </View>
 
           {/* Custom Text (Optional) */}
           <View style={{ marginBottom: 24 }}>
-            <Text style={[commonStyles.subtitle, { textAlign: 'left', marginBottom: 12 }]}>
-              Custom Text (Optional)
-            </Text>
-            <TextInput
-              style={[commonStyles.input, { minHeight: 80, textAlignVertical: 'top' }]}
+            <Text style={[commonStyles.subtitle, { textAlign: 'left', marginBottom: 12 }]}>Custom Text (Optional)</Text>
+            <Input
               placeholder="Add any specific affirmations you'd like to include..."
-              placeholderTextColor={colors.textMuted}
               value={customText}
               onChangeText={setCustomText}
               multiline
+              style={{ minHeight: 80 }}
             />
           </View>
 

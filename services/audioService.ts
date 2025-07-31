@@ -53,13 +53,13 @@ class AudioService {
 
 
   
-  async loadAffirmationAudio(assetId: number): Promise<void> {
+  async loadAffirmationAudio(uri: string): Promise<void> {
     await this.initialize();
     try {
       if (this.affirmationSound) {
         await this.affirmationSound.unloadAsync();
       }
-      const { sound } = await Audio.Sound.createAsync(assetId);
+      const { sound } = await Audio.Sound.createAsync({ uri });
       this.affirmationSound = sound;
     } catch (error) {
       console.error('Failed to load affirmation audio:', error);
@@ -67,13 +67,13 @@ class AudioService {
     }
   }
 
-  async loadBackingTrack(assetId: number): Promise<void> {
+  async loadBackingTrack(uri: string): Promise<void> {
     await this.initialize();
     try {
       if (this.backingTrackSound) {
         await this.backingTrackSound.unloadAsync();
       }
-      const { sound } = await Audio.Sound.createAsync(assetId);
+      const { sound } = await Audio.Sound.createAsync({ uri });
       this.backingTrackSound = sound;
     } catch (error) {
       console.error('Failed to load backing track:', error);

@@ -8,5 +8,18 @@ export default defineConfig({
     exclude: ['node_modules', 'dist', '.expo', 'web-build'],
     setupFiles: ['./test-setup.ts'],
   },
+  resolve: {
+    alias: {
+      '@': __dirname,
+      '@components': __dirname + '/components',
+      '@styles': __dirname + '/styles',
+      '@hooks': __dirname + '/hooks',
+      '@types': __dirname + '/types',
+      '@utils': __dirname + '/utils',
+      '@store': __dirname + '/store',
+      '@assets': __dirname + '/assets',
+      '@services': __dirname + '/services',
+    },
+  },
 });
 

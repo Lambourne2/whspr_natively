@@ -250,7 +250,67 @@ export default function SettingsScreen() {
           </View>
         )}
 
+        {/* API Keys */}
+        {renderSection(
+          'API Keys',
+          <View>
+            {renderSettingItem(
+              'key',
+              'OpenRouter API Key',
+              settings.openRouterApiKey ? 'Configured' : 'Not configured',
+              <TouchableOpacity 
+                onPress={() => {
+                  Alert.prompt(
+                    'OpenRouter API Key',
+                    'Enter your OpenRouter API key for text generation:',
+                    [
+                      {
+                        text: 'Cancel',
+                        style: 'cancel',
+                      },
+                      {
+                        text: 'Save',
+                        onPress: (text) => updateSettings({ openRouterApiKey: text || '' }),
+                      },
+                    ],
+                    'plain-text',
+                    settings.openRouterApiKey
+                  );
+                }}
+              >
+                <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+              </TouchableOpacity>
+            )}
 
+            {renderSettingItem(
+              'key',
+              'ElevenLabs API Key',
+              settings.elevenLabsApiKey ? 'Configured' : 'Not configured',
+              <TouchableOpacity 
+                onPress={() => {
+                  Alert.prompt(
+                    'ElevenLabs API Key',
+                    'Enter your ElevenLabs API key for text-to-speech:',
+                    [
+                      {
+                        text: 'Cancel',
+                        style: 'cancel',
+                      },
+                      {
+                        text: 'Save',
+                        onPress: (text) => updateSettings({ elevenLabsApiKey: text || '' }),
+                      },
+                    ],
+                    'plain-text',
+                    settings.elevenLabsApiKey
+                  );
+                }}
+              >
+                <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
 
         {/* Data & Storage */}
         {renderSection(

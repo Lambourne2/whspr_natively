@@ -55,6 +55,21 @@ vi.mock('expo-router', () => ({
   useGlobalSearchParams: vi.fn(() => ({})),
 }));
 
+// Mock audioService
+vi.mock('@/services/audioService', () => ({
+  audioService: {
+    initialize: vi.fn(() => Promise.resolve()),
+    loadAffirmationAudio: vi.fn(() => Promise.resolve()),
+    loadBackingTrack: vi.fn(() => Promise.resolve()),
+    play: vi.fn(() => Promise.resolve()),
+    pause: vi.fn(() => Promise.resolve()),
+    stop: vi.fn(() => Promise.resolve()),
+    setVolume: vi.fn(() => Promise.resolve()),
+    unload: vi.fn(() => Promise.resolve()),
+    isPlaying: vi.fn(() => false),
+  },
+}));
+
 // Mock React Native components
 vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },
@@ -67,6 +82,26 @@ vi.mock('react-native', () => ({
   Share: {
     share: vi.fn(),
   },
+}));
+
+// Mock asset requires
+vi.mock('@/assets/audio/054hzDeltaWaves.mp3', () => ({
+  default: '/mock/assets/054hzDeltaWaves.mp3'
+}));
+vi.mock('@/assets/audio/48hzThetaWaves.mp3', () => ({
+  default: '/mock/assets/48hzThetaWaves.mp3'
+}));
+vi.mock('@/assets/audio/813hzAlphaWaves.mp3', () => ({
+  default: '/mock/assets/813hzAlphaWaves.mp3'
+}));
+vi.mock('@/assets/audio/423hzEarthsNaturalFrequency.mp3', () => ({
+  default: '/mock/assets/423hzEarthsNaturalFrequency.mp3'
+}));
+vi.mock('@/assets/audio/528hzLoveFrequency.mp3', () => ({
+  default: '/mock/assets/528hzLoveFrequency.mp3'
+}));
+vi.mock('@/assets/audio/852hzThirdEyeChakra.mp3', () => ({
+  default: '/mock/assets/852hzThirdEyeChakra.mp3'
 }));
 
 // Reset all mocks before each test

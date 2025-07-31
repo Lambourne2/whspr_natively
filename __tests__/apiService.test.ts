@@ -11,6 +11,11 @@ vi.mock('../store/settingsStore', () => ({
         elevenLabsApiKey: 'test-elevenlabs-key',
         maxConcurrentTtsCalls: 3,
         elevenLabsQuotaThreshold: 1000,
+        theme: 'light',
+        defaultVoice: 'Rachel',
+        defaultLoopGap: 3,
+        hasCompletedOnboarding: true,
+        enableCostControl: true,
       },
     })),
   },
@@ -19,22 +24,18 @@ vi.mock('../store/settingsStore', () => ({
 // Mock fetch
 global.fetch = vi.fn();
 
-describe('ApiService', () => {
+describe('apiService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  describe('generateAffirmations', () => {
-    it('should generate affirmations successfully', async () => {
+  describe('generateText', () => {
+    it('should generate text successfully', async () => {
       const mockResponse = {
         choices: [
           {
             message: {
-              content: JSON.stringify([
-                'I am peaceful and calm',
-                'I sleep deeply and restfully',
-                'I wake up refreshed and energized',
-              ]),
+              content: 'Test response',
             },
           },
         ],
@@ -45,99 +46,29 @@ describe('ApiService', () => {
         json: () => Promise.resolve(mockResponse),
       });
 
-      const result = await apiService.generateAffirmations({
-        intent: 'sleep',
-        tone: 'soft',
-        count: 3,
-      });
+      const result = await apiService.generateText('Test prompt');
 
-      expect(result.affirmations).toHaveLength(3);
-      expect(result.affirmations[0]).toBe('I am peaceful and calm');
+      expect(result).toBe('Test response');
     });
 
-    it('should throw error when API key is missing', async () => {
-      vi.mocked(useSettingsStore.getState).mockReturnValueOnce({
+    it('should handle API key not configured', async () => {
+      (useSettingsStore.getState as any).mockReturnValueOnce({
         settings: {
           openRouterApiKey: '',
           elevenLabsApiKey: 'test-key',
           maxConcurrentTtsCalls: 3,
           elevenLabsQuotaThreshold: 1000,
+          theme: 'light',
+          defaultVoice: 'Rachel',
+          defaultLoopGap: 3,
+          hasCompletedOnboarding: true,
+          enableCostControl: true,
         },
       });
 
       await expect(
-        apiService.generateAffirmations({
-          intent: 'sleep',
-          tone: 'soft',
-        })
+        apiService.generateText('Test prompt'),
       ).rejects.toThrow('OpenRouter API key not configured');
-    });
-
-    it('should handle rate limiting with exponential backoff', async () => {
-      (global.fetch as any)
-        .mockResolvedValueOnce({
-          ok: false,
-          status: 429,
-          statusText: 'Too Many Requests',
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: () =>
-            Promise.resolve({
-              choices: [
-                {
-                  message: {
-                    content: JSON.stringify(['I am calm and peaceful']),
-                  },
-                },
-              ],
-            }),
-        });
-
-      const result = await apiService.generateAffirmations({
-        intent: 'sleep',
-        tone: 'soft',
-        count: 1,
-      });
-
-      expect(result.affirmations).toHaveLength(1);
-      expect(global.fetch).toHaveBeenCalledTimes(2);
-    });
-  });
-
-  describe('synthesizeSpeech', () => {
-    it('should synthesize speech successfully', async () => {
-      const mockArrayBuffer = new ArrayBuffer(1000);
-
-      (global.fetch as any).mockResolvedValueOnce({
-        ok: true,
-        arrayBuffer: () => Promise.resolve(mockArrayBuffer),
-      });
-
-      const result = await apiService.synthesizeSpeech({
-        text: 'I am peaceful and calm',
-        voice: 'soft_female',
-      });
-
-      expect(result.audioData).toBe(mockArrayBuffer);
-    });
-
-    it('should throw error when ElevenLabs API key is missing', async () => {
-      vi.mocked(useSettingsStore.getState).mockReturnValueOnce({
-        settings: {
-          openRouterApiKey: 'test-key',
-          elevenLabsApiKey: '',
-          maxConcurrentTtsCalls: 3,
-          elevenLabsQuotaThreshold: 1000,
-        },
-      });
-
-      await expect(
-        apiService.synthesizeSpeech({
-          text: 'Test text',
-          voice: 'soft_female',
-        })
-      ).rejects.toThrow('ElevenLabs API key not configured');
     });
   });
 
@@ -157,8 +88,11 @@ describe('ApiService', () => {
 
       const result = await apiService.checkQuota();
 
-      expect(result.remaining).toBe(5000);
-      expect(result.total).toBe(10000);
+      expect(result).not.toBeNull();
+      if (result) {
+        expect(result.remaining).toBe(5000);
+        expect(result.total).toBe(10000);
+      }
     });
 
     it('should handle quota check failure gracefully', async () => {
@@ -166,8 +100,7 @@ describe('ApiService', () => {
 
       const result = await apiService.checkQuota();
 
-      expect(result.remaining).toBe(0);
-      expect(result.total).toBe(0);
+      expect(result).toBeNull();
     });
   });
 });

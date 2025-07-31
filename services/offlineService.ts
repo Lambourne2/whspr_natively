@@ -65,7 +65,7 @@ class OfflineService {
     // Check if affirmation files exist locally
     for (const affirmation of affirmations) {
       try {
-        const fileInfo = await FileSystem.getInfoAsync(affirmation.mp3Uri);
+        const fileInfo = await FileSystem.getInfoAsync(affirmation.audioUri);
         if (!fileInfo.exists) {
           missingAssets.push(affirmation.title);
         }
@@ -89,7 +89,7 @@ class OfflineService {
 
     for (const affirmation of affirmations) {
       try {
-        const fileInfo = await FileSystem.getInfoAsync(affirmation.mp3Uri);
+        const fileInfo = await FileSystem.getInfoAsync(affirmation.audioUri);
         if (fileInfo.exists && fileInfo.size && fileInfo.size > 0) {
           valid.push(affirmation.id);
         } else {
@@ -125,12 +125,12 @@ class OfflineService {
       // Calculate total size used by affirmation files
       for (const affirmation of affirmations) {
         try {
-          const fileInfo = await FileSystem.getInfoAsync(affirmation.mp3Uri);
+          const fileInfo = await FileSystem.getInfoAsync(affirmation.audioUri);
           if (fileInfo.exists && fileInfo.size) {
             usedByApp += fileInfo.size;
           }
         } catch (error) {
-          console.warn(`Failed to get size for ${affirmation.title}:`, error);
+          console.warn(`Failed to get file info for affirmation ${affirmation.id}:`, error);
         }
       }
 
@@ -211,7 +211,7 @@ class OfflineService {
       }
 
       // Check if file exists
-      const fileInfo = await FileSystem.getInfoAsync(affirmation.mp3Uri);
+      const fileInfo = await FileSystem.getInfoAsync(affirmation.audioUri);
       if (!fileInfo.exists) {
         throw new Error('Audio file not found');
       }
@@ -222,7 +222,7 @@ class OfflineService {
       
       const exportPath = `${exportDir}${affirmation.title.replace(/[^a-zA-Z0-9]/g, '_')}.mp3`;
       await FileSystem.copyAsync({
-        from: affirmation.mp3Uri,
+        from: affirmation.audioUri,
         to: exportPath,
       });
 
