@@ -84,12 +84,12 @@ export default function PlayerScreen() {
           setCurrentAffirmation(affirmation);
           try {
             const audioSource = audioAssets[affirmation.audioUri]?.asset;
-            if (!audioSource) {
+            if (typeof audioSource !== 'string') {
               Alert.alert('Error', 'Could not find the selected audio track.');
               setIsLoading(false);
               return;
             }
-
+            
             await audioService.loadAffirmationAudio(audioSource);
             await audioService.play(affirmationVolume, backingTrackVolume, settings.fadeInDuration);
             setIsPlaybackActive(true);
