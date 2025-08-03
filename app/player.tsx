@@ -244,13 +244,13 @@ export default function PlayerScreen() {
   );
 
   return (
-    <View style={commonStyles.container}>
+    <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={[commonStyles.title, { fontFamily: 'Inter_700Bold' }]}>
+        <Text style={[styles.title, { fontFamily: 'Inter_700Bold' }]}>
           Player
         </Text>
         <TouchableOpacity
@@ -261,7 +261,28 @@ export default function PlayerScreen() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={commonStyles.content} showsVerticalScrollIndicator={false}>
+      {/* Now Playing Bar */}
+      {currentAffirmation && (
+        <TouchableOpacity
+          style={styles.nowPlayingBar}
+          onPress={() => {
+            // Optional: expand or navigate to detailed player
+          }}
+        >
+          <Text style={styles.nowPlayingText} numberOfLines={1}>
+            🎵 Now Playing: {currentAffirmation.title}
+          </Text>
+          <TouchableOpacity onPress={handlePlayPause} style={styles.nowPlayingPlayPause}>
+            {isPlaybackActive ? (
+              <Ionicons name="pause" size={24} color={colors.primary} />
+            ) : (
+              <Ionicons name="play" size={24} color={colors.primary} />
+            )}
+          </TouchableOpacity>
+        </TouchableOpacity>
+      )}
+
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Affirmation Info */}
         <View style={styles.affirmationInfo}>
           <Text style={styles.affirmationTitle} numberOfLines={2}>
@@ -373,6 +394,33 @@ const styles = StyleSheet.create({
   },
   trackButton: {
     padding: 12,
+  },
+  title: {
+    fontSize: 24,
+    color: colors.text,
+  },
+  nowPlayingBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    backgroundColor: colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  nowPlayingText: {
+    flex: 1,
+    fontSize: 16,
+    fontFamily: 'Inter_600SemiBold',
+    color: colors.text,
+    marginRight: 12,
+  },
+  nowPlayingPlayPause: {
+    padding: 8,
+  },
+  content: {
+    flex: 1,
   },
   affirmationInfo: {
     padding: 24,
