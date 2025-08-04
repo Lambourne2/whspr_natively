@@ -213,7 +213,7 @@ export default function CreateTrackScreen() {
           title="Create Track"
           subtitle="Build your personalized sleep journey"
         />
-
+  
         <TextInput
           placeholder="Enter track title"
           value={title}
@@ -221,7 +221,7 @@ export default function CreateTrackScreen() {
           style={commonStyles.input}
           accessibilityLabel="Track title input"
         />
-
+  
         <Text style={commonStyles.subtitle}>Select Backing Track</Text>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
           {AUDIO_TRACKS.map((track) => (
@@ -243,7 +243,7 @@ export default function CreateTrackScreen() {
             </TouchableOpacity>
           ))}
         </View>
-
+  
         <Text style={[commonStyles.subtitle, { marginTop: 24 }]}>Affirmations</Text>
         <TextInput
           placeholder="Write your own affirmations..."
@@ -256,11 +256,17 @@ export default function CreateTrackScreen() {
         <Text style={commonStyles.textMuted}>
           Write your own affirmations above. You can use AI Voice to speak it or record your own voice.
         </Text>
-
+  
         <View style={{ flexDirection: 'row', justifyContent: 'space-around', marginVertical: 16 }}>
           <Button
             text="AI Voice"
-            onPress={() => toggleSwitch('ai')}
+            onPress={() => {
+              toggleSwitch('ai');
+              router.push({
+                pathname: '/ai-voice-select',
+                params: { affirmationText },
+              });
+            }}
             variant={aiVoiceEnabled ? 'primary' : 'secondary'}
             style={{ paddingVertical: 6, paddingHorizontal: 12 }}
           />
@@ -277,7 +283,7 @@ export default function CreateTrackScreen() {
             style={{ paddingVertical: 6, paddingHorizontal: 12 }}
           />
         </View>
-
+  
         {voiceRecordEnabled && (
           <View style={{ alignItems: 'center', gap: 10, marginBottom: 20 }}>
             {!recording ? (
@@ -290,7 +296,7 @@ export default function CreateTrackScreen() {
             )}
           </View>
         )}
-
+  
         <Text style={commonStyles.subtitle}>Affirmation Volume</Text>
         <Slider
           minimumValue={0}
@@ -300,7 +306,7 @@ export default function CreateTrackScreen() {
           onValueChange={setAffirmationVolume}
           accessibilityLabel="Adjust affirmation volume"
         />
-
+  
         <Text style={commonStyles.subtitle}>Backing Track Volume</Text>
         <Slider
           minimumValue={0}
@@ -310,7 +316,7 @@ export default function CreateTrackScreen() {
           onValueChange={setBackingTrackVolume}
           accessibilityLabel="Adjust backing track volume"
         />
-
+  
         <Text style={commonStyles.subtitle}>Duration: {duration} min</Text>
         <Slider
           minimumValue={1}
@@ -320,7 +326,7 @@ export default function CreateTrackScreen() {
           onValueChange={setDuration}
           accessibilityLabel="Set track duration in minutes"
         />
-
+  
         <Button
           text="Create Track"
           onPress={() => console.log('Saving...')}
@@ -330,4 +336,4 @@ export default function CreateTrackScreen() {
       </ScrollView>
     </KeyboardAvoidingView>
   );
-}
+}  
