@@ -83,16 +83,22 @@ export default function PlayerScreen() {
           setIsLoading(true);
           setCurrentAffirmation(affirmation);
           try {
-            const audioSource = audioAssets[affirmation.audioUri]?.asset;
-            if (typeof audioSource !== 'string') {
+            const affirmationUri = audioAssets[affirmation.audioUri]?.asset;
+            if (!affirmationUri || typeof affirmationUri !== 'string') {
               Alert.alert('Error', 'Could not find the selected audio track.');
               setIsLoading(false);
               return;
             }
             
-            await audioService.loadAffirmationAudio(audioSource);
-            await audioService.play(affirmationVolume, backingTrackVolume, settings.fadeInDuration);
+            await audioService.playAudio({
+              affirmationUri,
+              backingTrackUri: currentBackingTrack?.uri ?? '',
+              affirmationVolume,
+              backingTrackVolume,
+              fadeInDurationMs: settings.fadeInDuration,
+            });
             setIsPlaybackActive(true);
+
             const status = await audioService.getStatus();
             if (status) {
               setDuration(status.duration);
@@ -107,14 +113,15 @@ export default function PlayerScreen() {
       }
     };
     loadInitialAffirmation();
-  }, [id, affirmations, setCurrentAffirmation, settings.fadeInDuration]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, affirmations, currentBackingTrack, affirmationVolume, backingTrackVolume, settings.fadeInDuration]);
 
   useEffect(() => {
     return () => {
       if (progressInterval.current) {
         clearInterval(progressInterval.current);
       }
-      audioService.stop(settings.fadeOutDuration);
+      audioService.stopAll(settings.fadeOutDuration);
     };
   }, [settings.fadeOutDuration]);
 
@@ -131,7 +138,7 @@ export default function PlayerScreen() {
       <View style={styles.centeredContainer}>
         <Text style={styles.errorText}>No affirmation selected.</Text>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Text style={styles.backButtonText}>Go Back</Text>
+          <Text style={styles.errorText}>Go Back</Text>
         </TouchableOpacity>
       </View>
     );
@@ -139,16 +146,28 @@ export default function PlayerScreen() {
 
   const handlePlayPause = async () => {
     if (isPlaybackActive) {
-      await audioService.pause();
+      await audioService.pauseAll();
       setIsPlaybackActive(false);
     } else {
-      await audioService.play(affirmationVolume, backingTrackVolume, settings.fadeInDuration);
+      const affirmationUri = audioAssets[currentAffirmation.audioUri]?.asset;
+      if (!affirmationUri || typeof affirmationUri !== 'string') {
+        Alert.alert('Error', 'Audio asset missing or invalid');
+        return;
+      }
+      await audioService.playAudio({
+        affirmationUri,
+        backingTrackUri: currentBackingTrack?.uri ?? '',
+        affirmationVolume,
+        backingTrackVolume,
+        fadeInDurationMs: settings.fadeInDuration,
+      });
       setIsPlaybackActive(true);
+      startProgressTracking();
     }
   };
 
   const handleStop = async () => {
-    await audioService.stop(settings.fadeOutDuration);
+    await audioService.stopAll(settings.fadeOutDuration);
     setIsPlaybackActive(false);
     router.back();
   };
@@ -158,29 +177,37 @@ export default function PlayerScreen() {
     await audioService.setAffirmationVolume(volume);
   };
 
+  const handleBackingTrackVolumeChange = async (volume: number) => {
+    setBackingTrackVolume(volume);
+    await audioService.setBackingTrackVolume(volume);
+  };
+
+  const handleSelectBackingTrack = async (track: BackingTrack) => {
+    setCurrentBackingTrack(track);
+    if (track.uri) {
+      await audioService.loadBackingTrack(track.uri);
+    } else {
+      await audioService.unloadBackingTrack();
+    }
+  };
+
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const getNextAffirmationTime = () => {
-    const loopGapSeconds = currentAffirmation.loopGap * 60;
-    const timeUntilNext = loopGapSeconds - (currentTime % loopGapSeconds);
-    return formatTime(timeUntilNext);
-  };
-
   const renderWaveform = () => {
     const progress = duration > 0 ? currentTime / duration : 0;
     const waveformBars = 50;
-    
+
     return (
       <View style={styles.waveformContainer}>
         {Array.from({ length: waveformBars }).map((_, index) => {
           const barProgress = index / waveformBars;
           const isActive = barProgress <= progress;
           const height = Math.random() * 30 + 10; // Random height for visual effect
-          
+
           return (
             <View
               key={index}
@@ -198,11 +225,6 @@ export default function PlayerScreen() {
     );
   };
 
-  const handleSelectBackingTrack = (track: BackingTrack) => {
-    setCurrentBackingTrack(track);
-    audioService.loadBackingTrack(track.uri);
-  };
-
   const renderBackingTrackSelector = () => (
     <View style={styles.backingTrackSelector}>
       <Text style={[styles.sectionTitle, { fontFamily: 'Inter_600SemiBold' }]}>
@@ -214,15 +236,15 @@ export default function PlayerScreen() {
             styles.backingTrackCard,
             !currentBackingTrack && styles.selectedTrackCard,
           ]}
-          onPress={() => {
+          onPress={async () => {
             setCurrentBackingTrack(null);
-            audioService.unloadBackingTrack();
+            await audioService.unloadBackingTrack();
           }}
         >
           <Ionicons name="close" size={24} color={colors.textSecondary} />
           <Text style={styles.trackTitle}>No Track</Text>
         </TouchableOpacity>
-        
+
         {backingTracks.map((track) => (
           <TouchableOpacity
             key={track.id}
@@ -363,7 +385,7 @@ export default function PlayerScreen() {
               minimumValue={0}
               maximumValue={1}
               value={backingTrackVolume}
-              onValueChange={(volume) => setBackingTrackVolume(volume)}
+              onValueChange={handleBackingTrackVolumeChange}
             />
             <Text style={styles.volumeValue}>{Math.round(backingTrackVolume * 100)}%</Text>
           </View>
@@ -561,31 +583,33 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: colors.border,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowRadius: 5,
+    shadowOffset: { width: 0, height: 1 },
   },
   selectedTrackCard: {
     borderColor: colors.primary,
-    backgroundColor: `${colors.primary}15`,
+    backgroundColor: `${colors.primary}30`, // 30% opacity primary color
     shadowColor: colors.primary,
     shadowOpacity: 0.1,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
   },
   trackTitle: {
     fontSize: 14,
     fontFamily: 'Inter_600SemiBold',
     color: colors.text,
-    textAlign: 'center',
     marginTop: 12,
+    textAlign: 'center',
   },
   trackFrequency: {
     fontSize: 12,
     fontFamily: 'Inter_400Regular',
     color: colors.textSecondary,
-    textAlign: 'center',
     marginTop: 4,
+    textAlign: 'center',
   },
+
   centeredContainer: {
     flex: 1,
     backgroundColor: colors.background,
@@ -599,10 +623,5 @@ const styles = StyleSheet.create({
     color: colors.text,
     textAlign: 'center',
     marginBottom: 20,
-  },
-  backButtonText: {
-    fontSize: 16,
-    fontFamily: 'Inter_600SemiBold',
-    color: colors.primary,
   },
 });

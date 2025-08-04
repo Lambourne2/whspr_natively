@@ -1,258 +1,179 @@
-import { Audio, AudioMode, InterruptionModeIOS, InterruptionModeAndroid } from 'expo-av';
-import { Platform } from 'react-native';
-import * as FileSystem from 'expo-file-system';
-import { encode } from 'base-64';
+import { Audio, AVPlaybackStatus, AVPlaybackStatusSuccess } from 'expo-av';
 
-
-export interface AudioFile {
-  uri: string;
-  duration: number;
-}
+type PlayAudioOptions = {
+  affirmationUri: string;
+  backingTrackUri?: string;
+  affirmationVolume?: number;
+  backingTrackVolume?: number;
+  fadeInDurationMs?: number;
+};
 
 class AudioService {
-  private static instance: AudioService;
   private affirmationSound: Audio.Sound | null = null;
   private backingTrackSound: Audio.Sound | null = null;
-  private isInitialized = false;
 
-  static getInstance(): AudioService {
-    if (!AudioService.instance) {
-      AudioService.instance = new AudioService();
-    }
-    return AudioService.instance;
-  }
+  private affirmationVolume: number = 1;
+  private backingTrackVolume: number = 1;
 
-  async initialize(): Promise<void> {
-    if (this.isInitialized) return;
+  async playAudio(options: PlayAudioOptions) {
+    const {
+      affirmationUri,
+      backingTrackUri,
+      affirmationVolume = 1,
+      backingTrackVolume = 1,
+      fadeInDurationMs = 1000,
+    } = options;
+
+    this.affirmationVolume = affirmationVolume;
+    this.backingTrackVolume = backingTrackVolume;
 
     try {
-      const config = this.getAudioModeConfig();
-      await Audio.setAudioModeAsync(config);
-      this.isInitialized = true;
-    } catch (error) {
-      console.error('Failed to initialize audio service:', error);
-      throw error;
-    }
-  }
-
-  private getAudioModeConfig(): AudioMode {
-    return {
-      staysActiveInBackground: true,
-      allowsRecordingIOS: false,
-      interruptionModeIOS: InterruptionModeIOS.MixWithOthers,
-      playsInSilentModeIOS: true,
-      interruptionModeAndroid: InterruptionModeAndroid.DuckOthers,
-      shouldDuckAndroid: true,
-      playThroughEarpieceAndroid: false,
-    };
-  }
-
-
-
-
-
-
-  
-  async loadAffirmationAudio(uri: string): Promise<void> {
-    await this.initialize();
-    try {
+      // Affirmation
       if (this.affirmationSound) {
         await this.affirmationSound.unloadAsync();
+        this.affirmationSound = null;
       }
-      const { sound } = await Audio.Sound.createAsync({ uri });
-      this.affirmationSound = sound;
+      this.affirmationSound = new Audio.Sound();
+      await this.affirmationSound.loadAsync({ uri: affirmationUri });
+      await this.affirmationSound.setIsLoopingAsync(false);
+      await this.affirmationSound.setVolumeAsync(0);
+      await this.affirmationSound.playAsync();
+      await this.fadeVolume(this.affirmationSound, 0, affirmationVolume, fadeInDurationMs);
+
+      // Backing Track (optional)
+      if (backingTrackUri) {
+        if (this.backingTrackSound) {
+          await this.backingTrackSound.unloadAsync();
+          this.backingTrackSound = null;
+        }
+        this.backingTrackSound = new Audio.Sound();
+        await this.backingTrackSound.loadAsync({ uri: backingTrackUri });
+        await this.backingTrackSound.setIsLoopingAsync(true);
+        await this.backingTrackSound.setVolumeAsync(0);
+        await this.backingTrackSound.playAsync();
+        await this.fadeVolume(this.backingTrackSound, 0, backingTrackVolume, fadeInDurationMs);
+      }
     } catch (error) {
-      console.error('Failed to load affirmation audio:', error);
+      console.error('AudioService playAudio error:', error);
       throw error;
     }
   }
 
-  async loadBackingTrack(uri: string): Promise<void> {
-    await this.initialize();
+  async loadBackingTrack(uri: string) {
     try {
       if (this.backingTrackSound) {
         await this.backingTrackSound.unloadAsync();
+        this.backingTrackSound = null;
       }
-      const { sound } = await Audio.Sound.createAsync({ uri });
-      this.backingTrackSound = sound;
+      this.backingTrackSound = new Audio.Sound();
+      await this.backingTrackSound.loadAsync({ uri });
+      await this.backingTrackSound.setIsLoopingAsync(true);
+      await this.backingTrackSound.setVolumeAsync(this.backingTrackVolume);
+      await this.backingTrackSound.playAsync();
     } catch (error) {
-      console.error('Failed to load backing track:', error);
+      console.error('AudioService loadBackingTrack error:', error);
       throw error;
     }
   }
 
-  async unloadBackingTrack(): Promise<void> {
+  async unloadBackingTrack() {
     if (this.backingTrackSound) {
-      await this.backingTrackSound.unloadAsync();
-      this.backingTrackSound = null;
+      try {
+        await this.backingTrackSound.stopAsync();
+        await this.backingTrackSound.unloadAsync();
+      } catch (error) {
+        console.error('AudioService unloadBackingTrack error:', error);
+      } finally {
+        this.backingTrackSound = null;
+      }
     }
   }
 
-  async play(
-    affirmationVolume: number = 0.8,
-    backingTrackVolume: number = 0.6,
-    fadeInDuration: number = 3000
-  ): Promise<void> {
-    await this.initialize();
+  async pauseAll() {
     try {
-      const promises: Promise<any>[] = [];
       if (this.affirmationSound) {
-        promises.push(this.affirmationSound.playAsync());
+        await this.affirmationSound.pauseAsync();
       }
       if (this.backingTrackSound) {
-        promises.push(this.backingTrackSound.playAsync());
-      }
-      await Promise.all(promises);
-      if (fadeInDuration > 0) {
-        await this.fadeIn(affirmationVolume, backingTrackVolume, fadeInDuration);
-      } else {
-        await this.setVolumes(affirmationVolume, backingTrackVolume);
+        await this.backingTrackSound.pauseAsync();
       }
     } catch (error) {
-      console.error('Failed to play audio:', error);
-      throw error;
+      console.error('AudioService pauseAll error:', error);
     }
   }
 
-  async pause(): Promise<void> {
+  async stopAll(fadeOutDurationMs = 1000) {
     try {
-      const promises: Promise<any>[] = [];
       if (this.affirmationSound) {
-        promises.push(this.affirmationSound.pauseAsync());
+        await this.fadeVolume(this.affirmationSound, this.affirmationVolume, 0, fadeOutDurationMs);
+        await this.affirmationSound.stopAsync();
+        await this.affirmationSound.unloadAsync();
+        this.affirmationSound = null;
       }
       if (this.backingTrackSound) {
-        promises.push(this.backingTrackSound.pauseAsync());
+        await this.fadeVolume(this.backingTrackSound, this.backingTrackVolume, 0, fadeOutDurationMs);
+        await this.backingTrackSound.stopAsync();
+        await this.backingTrackSound.unloadAsync();
+        this.backingTrackSound = null;
       }
-      await Promise.all(promises);
     } catch (error) {
-      console.error('Failed to pause audio:', error);
-      throw error;
+      console.error('AudioService stopAll error:', error);
     }
   }
 
-  async stop(fadeOutDuration: number = 3000): Promise<void> {
-    try {
-      if (fadeOutDuration > 0) {
-        await this.fadeOut(fadeOutDuration);
-      }
-      const promises: Promise<any>[] = [];
-      if (this.affirmationSound) {
-        promises.push(this.affirmationSound.stopAsync());
-      }
-      if (this.backingTrackSound) {
-        promises.push(this.backingTrackSound.stopAsync());
-      }
-      await Promise.all(promises);
-    } catch (error) {
-      console.error('Failed to stop audio:', error);
-      throw error;
-    }
-  }
-
-  async setAffirmationVolume(volume: number): Promise<void> {
+  async setAffirmationVolume(volume: number) {
+    this.affirmationVolume = volume;
     if (this.affirmationSound) {
       await this.affirmationSound.setVolumeAsync(volume);
     }
   }
 
-  async setBackingTrackVolume(volume: number): Promise<void> {
+  async setBackingTrackVolume(volume: number) {
+    this.backingTrackVolume = volume;
     if (this.backingTrackSound) {
       await this.backingTrackSound.setVolumeAsync(volume);
     }
   }
 
-  async setVolumes(affirmationVolume: number, backingTrackVolume: number): Promise<void> {
+  /** Returns status info of affirmation playback or null */
+  async getStatus() {
+    if (!this.affirmationSound) return null;
+
     try {
-      const promises: Promise<any>[] = [];
-      if (this.affirmationSound) {
-        promises.push(this.affirmationSound.setVolumeAsync(affirmationVolume));
-      }
-      if (this.backingTrackSound) {
-        promises.push(this.backingTrackSound.setVolumeAsync(backingTrackVolume));
-      }
-      await Promise.all(promises);
-    } catch (error) {
-      console.error('Failed to set volumes:', error);
-      throw error;
-    }
-  }
-
-  async getStatus(): Promise<{
-    currentTime: number;
-    duration: number;
-    isPlaying: boolean;
-    isFinished: boolean;
-  } | null> {
-    if (!this.affirmationSound) {
-      return null;
-    }
-    const status = await this.affirmationSound.getStatusAsync();
-    if (!status.isLoaded) {
-      return null;
-    }
-    return {
-      currentTime: (status.positionMillis ?? 0) / 1000,
-      duration: (status.durationMillis ?? 0) / 1000,
-      isPlaying: status.isPlaying,
-      isFinished: status.didJustFinish,
-    };
-  }
-
-  private async fadeIn(
-    targetAffirmationVolume: number,
-    targetBackingTrackVolume: number,
-    duration: number
-  ): Promise<void> {
-    const steps = 20;
-    const stepDuration = duration / steps;
-    for (let i = 0; i <= steps; i++) {
-      const progress = i / steps;
-      const affirmationVolume = targetAffirmationVolume * progress;
-      const backingTrackVolume = targetBackingTrackVolume * progress;
-      await this.setVolumes(affirmationVolume, backingTrackVolume);
-      await new Promise(resolve => setTimeout(resolve, stepDuration));
-    }
-  }
-
-  private async fadeOut(duration: number): Promise<void> {
-    let currentAffirmationVolume = 0;
-    let currentBackingTrackVolume = 0;
-
-    if (this.affirmationSound) {
       const status = await this.affirmationSound.getStatusAsync();
-      if (status.isLoaded) currentAffirmationVolume = status.volume ?? 0;
-    }
+      if (!status.isLoaded) return null;
 
-    if (this.backingTrackSound) {
-      const status = await this.backingTrackSound.getStatusAsync();
-      if (status.isLoaded) currentBackingTrackVolume = status.volume ?? 0;
-    }
-
-    const steps = 20;
-    const stepDuration = duration / steps;
-    for (let i = steps; i >= 0; i--) {
-      const progress = i / steps;
-      const affirmationVolume = currentAffirmationVolume * progress;
-      const backingTrackVolume = currentBackingTrackVolume * progress;
-      await this.setVolumes(affirmationVolume, backingTrackVolume);
-      await new Promise(resolve => setTimeout(resolve, stepDuration));
+      // Type guard for successful playback status
+      if ('isPlaying' in status) {
+        return {
+          isPlaying: status.isPlaying,
+          currentTime: status.positionMillis / 1000,
+          duration: status.durationMillis ? status.durationMillis / 1000 : 0,
+          isFinished: status.didJustFinish ?? false,
+        };
+      }
+      return null;
+    } catch (error) {
+      console.error('AudioService getStatus error:', error);
+      return null;
     }
   }
 
-  async cleanup(): Promise<void> {
-    try {
-      if (this.affirmationSound) {
-        await this.affirmationSound.unloadAsync();
-        this.affirmationSound = null;
-      }
-      if (this.backingTrackSound) {
-        await this.backingTrackSound.unloadAsync();
-        this.backingTrackSound = null;
-      }
-    } catch (error) {
-      console.error('Failed to cleanup audio service:', error);
+  private async fadeVolume(sound: Audio.Sound, from: number, to: number, durationMs: number) {
+    const steps = 10;
+    const stepDuration = durationMs / steps;
+    const volumeStep = (to - from) / steps;
+
+    for (let i = 1; i <= steps; i++) {
+      const newVolume = from + volumeStep * i;
+      await sound.setVolumeAsync(Math.min(1, Math.max(0, newVolume)));
+      await this.sleep(stepDuration);
     }
+  }
+
+  private sleep(ms: number) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 }
 
-export const audioService = AudioService.getInstance();
+export const audioService = new AudioService();
