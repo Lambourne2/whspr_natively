@@ -5,18 +5,12 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
-  Alert,
 } from 'react-native';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useFonts, Inter_400Regular, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
 import { commonStyles, colors } from '../styles/commonStyles';
-import Button from '../components/Button';
-import Input from '../components/Input';
-import Header from '../components/Header';
-import { useAffirmationStore } from '../store/affirmationStore';
-import { generateAffirmation } from '../services/aiService';
 
 const INTENTIONS = [
   'Deep Sleep',
@@ -40,25 +34,6 @@ const TONES = [
   'Soothing',
 ];
 
-const VOICES = [
-  'Female - Soft',
-  'Female - Warm',
-  'Male - Deep',
-  'Male - Calm',
-  'Neutral - Gentle',
-];
-
-export default function CreateAffirmationScreen() {
-  const [fontsLoaded] = useFonts({
-    Inter_400Regular,
-    Inter_600SemiBold,
-    Inter_700Bold,
-  });
-
-  const [selectedIntention, setSelectedIntention] = useState('');
-  const [selectedTone, setSelectedTone] = useState('');
-  const [selectedVoice, setSelectedVoice] = useState('');
-  const [customText, setCustomText] = useState('');
   const [title, setTitle] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [loopGap, setLoopGap] = useState(3);
@@ -112,31 +87,8 @@ export default function CreateAffirmationScreen() {
     }
   };
 
-  const renderSelector = (
-    title: string,
-    options: string[],
-    selected: string,
-    onSelect: (value: string) => void
-  ) => (
-    <View style={{ marginBottom: 24 }}>
-      <Text style={[commonStyles.subtitle, { textAlign: 'left', marginBottom: 12 }] }>{title}</Text>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-        {options.map((option) => (
-          <Button
-            key={option}
-            text={option}
-            onPress={() => onSelect(option)}
-            variant={selected === option ? 'primary' : 'secondary'}
-            style={{ margin: 4 }}
-          />
-        ))}
-      </View>
-    </View>
-  );
-
   return (
     <KeyboardAvoidingView
-      style={commonStyles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <ScrollView style={commonStyles.content} showsVerticalScrollIndicator={false}>
@@ -155,16 +107,6 @@ export default function CreateAffirmationScreen() {
               value={title}
               onChangeText={setTitle}
             />
-          </View>
-
-          {/* Intention */}
-          {renderSelector('Intention', INTENTIONS, selectedIntention, setSelectedIntention)}
-
-          {/* Tone */}
-          {renderSelector('Tone', TONES, selectedTone, setSelectedTone)}
-
-          {/* Voice */}
-          {renderSelector('Voice', VOICES, selectedVoice, setSelectedVoice)}
 
           {/* Loop Gap */}
           <View style={{ marginBottom: 24 }}>
