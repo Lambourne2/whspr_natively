@@ -11,6 +11,7 @@ import {
 import Slider from '@react-native-community/slider';
 import { Audio } from 'expo-av';
 import { useRouter } from 'expo-router';
+import { Feather } from '@expo/vector-icons'; // For back arrow
 import Header from '../components/Header';
 import Button from '../components/Button';
 import { commonStyles, colors } from '../styles/commonStyles';
@@ -130,7 +131,7 @@ export default function CreateTrackScreen() {
           linearPCMIsBigEndian: false,
           linearPCMIsFloat: false,
         },
-        web:{},
+        web: {},
       });
 
       await newRecording.startAsync();
@@ -175,8 +176,40 @@ export default function CreateTrackScreen() {
       style={[commonStyles.container, { paddingHorizontal: 16 }]}
     >
       <ScrollView showsVerticalScrollIndicator={false}>
-        <Header title="Create Track" subtitle="Build your personalized sleep journey" />
+        {/* Header with Back Button and Centered Title + Subtitle */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 16 }}>
+          <TouchableOpacity onPress={() => router.back()} style={{ padding: 8 }}>
+            <Feather name="arrow-left" size={28} color={colors.text} />
+          </TouchableOpacity>
 
+          <View style={{ flex: 1, alignItems: 'center' }}>
+            <Text
+              style={{
+                fontSize: 28,
+                fontWeight: '700',
+                color: colors.text,
+                textAlign: 'center',
+              }}
+              accessibilityRole="header"
+            >
+              Create Track
+            </Text>
+            <Text
+              style={{
+                fontSize: 16,
+                color: colors.textSecondary,
+                marginTop: 4,
+                textAlign: 'center',
+              }}
+            >
+              Build your personalized meditation journey
+            </Text>
+          </View>
+
+          <View style={{ width: 40 }} />
+        </View>
+
+        {/* Track Title Input */}
         <TextInput
           placeholder="Enter track title"
           value={title}
@@ -185,28 +218,49 @@ export default function CreateTrackScreen() {
           accessibilityLabel="Track title input"
         />
 
-        <Text style={commonStyles.subtitle}>Select Backing Track</Text>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+        {/* Backing Tracks Grid */}
+        <Text style={[commonStyles.subtitle, { marginTop: 24, marginBottom: 12 }]}>
+          Select Backing Track
+        </Text>
+        <View
+          style={{
+            flexDirection: 'row',
+            flexWrap: 'wrap',
+            justifyContent: 'space-between',
+            marginBottom: 20,
+          }}
+        >
           {AUDIO_TRACKS.map((track) => (
             <TouchableOpacity
               key={track.name}
               onPress={() => toggleAudio(track)}
               style={{
+                width: '30%', // 3 per row
                 padding: 12,
                 borderRadius: 12,
                 backgroundColor: selectedTrack === track.name ? colors.primary : colors.surface,
-                margin: 6,
+                marginBottom: 16,
+                alignItems: 'center',
+                justifyContent: 'center',
+                minHeight: 80,
               }}
               accessibilityRole="button"
               accessibilityLabel={`Select backing track ${track.name}`}
             >
-              <Text style={{ color: selectedTrack === track.name ? '#fff' : colors.textMuted }}>
+              <Text
+                style={{
+                  color: selectedTrack === track.name ? '#fff' : colors.textMuted,
+                  fontSize: 14,
+                  textAlign: 'center',
+                }}
+              >
                 {track.name}
               </Text>
             </TouchableOpacity>
           ))}
         </View>
 
+        {/* Affirmations Input */}
         <Text style={[commonStyles.subtitle, { marginTop: 24 }]}>Affirmations</Text>
         <TextInput
           placeholder="Write your own affirmations..."
@@ -220,6 +274,7 @@ export default function CreateTrackScreen() {
           Write your own affirmations above. You can use AI Voice to speak it or record your own voice.
         </Text>
 
+        {/* AI Voice / Record Switch Buttons */}
         <View style={{ flexDirection: 'row', justifyContent: 'space-around', marginVertical: 16 }}>
           <Button
             text="AI Voice"
@@ -241,6 +296,7 @@ export default function CreateTrackScreen() {
           />
         </View>
 
+        {/* Voice Recording Controls */}
         {voiceRecordEnabled && (
           <View style={{ alignItems: 'center', gap: 10, marginBottom: 20 }}>
             {!recording ? (
@@ -254,6 +310,7 @@ export default function CreateTrackScreen() {
           </View>
         )}
 
+        {/* Volume Sliders */}
         <Text style={commonStyles.subtitle}>Affirmation Volume</Text>
         <Slider
           minimumValue={0}
@@ -284,6 +341,7 @@ export default function CreateTrackScreen() {
           accessibilityLabel="Set track duration in minutes"
         />
 
+        {/* Create Track Button */}
         <Button
           text="Create Track"
           onPress={() => console.log('Saving...')}
