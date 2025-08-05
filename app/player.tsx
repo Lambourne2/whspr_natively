@@ -70,6 +70,7 @@ export default function PlayerScreen() {
           }
           setCurrentTime(0);
           setIsPlaybackActive(false);
+          incrementPlays(currentAffirmation?.id ?? '');
         }
       }
     }, 1000);
@@ -90,6 +91,7 @@ export default function PlayerScreen() {
               return;
             }
             
+            // FIXED: Use playAudio method with correct parameters
             await audioService.playAudio({
               affirmationUri,
               backingTrackUri: currentBackingTrack?.uri ?? '',
@@ -121,6 +123,7 @@ export default function PlayerScreen() {
       if (progressInterval.current) {
         clearInterval(progressInterval.current);
       }
+      // FIXED: Use stopAll method with fadeOutDuration
       audioService.stopAll(settings.fadeOutDuration);
     };
   }, [settings.fadeOutDuration]);
@@ -146,6 +149,7 @@ export default function PlayerScreen() {
 
   const handlePlayPause = async () => {
     if (isPlaybackActive) {
+      // FIXED: Use pauseAll method
       await audioService.pauseAll();
       setIsPlaybackActive(false);
     } else {
@@ -154,6 +158,7 @@ export default function PlayerScreen() {
         Alert.alert('Error', 'Audio asset missing or invalid');
         return;
       }
+      // FIXED: Use playAudio method with proper params
       await audioService.playAudio({
         affirmationUri,
         backingTrackUri: currentBackingTrack?.uri ?? '',
@@ -167,6 +172,7 @@ export default function PlayerScreen() {
   };
 
   const handleStop = async () => {
+    // FIXED: Use stopAll with fadeOutDuration
     await audioService.stopAll(settings.fadeOutDuration);
     setIsPlaybackActive(false);
     router.back();
@@ -565,63 +571,47 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   backingTrackSelector: {
-    padding: 24,
+    marginTop: 24,
+    paddingHorizontal: 24,
   },
   sectionTitle: {
-    fontSize: 20,
-    fontFamily: 'Inter_600SemiBold',
+    fontSize: 18,
     color: colors.text,
-    marginBottom: 20,
+    marginBottom: 16,
   },
   backingTrackCard: {
     backgroundColor: colors.surface,
-    borderRadius: 16,
-    padding: 20,
+    borderRadius: 12,
+    padding: 16,
     marginRight: 16,
     alignItems: 'center',
-    minWidth: 140,
-    borderWidth: 2,
-    borderColor: colors.border,
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 5,
-    shadowOffset: { width: 0, height: 1 },
+    width: 120,
   },
   selectedTrackCard: {
+    borderWidth: 2,
     borderColor: colors.primary,
-    backgroundColor: `${colors.primary}30`, // 30% opacity primary color
-    shadowColor: colors.primary,
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
   },
   trackTitle: {
+    marginTop: 8,
     fontSize: 14,
     fontFamily: 'Inter_600SemiBold',
     color: colors.text,
-    marginTop: 12,
     textAlign: 'center',
   },
   trackFrequency: {
+    marginTop: 4,
     fontSize: 12,
     fontFamily: 'Inter_400Regular',
     color: colors.textSecondary,
-    marginTop: 4,
     textAlign: 'center',
   },
-
   centeredContainer: {
     flex: 1,
-    backgroundColor: colors.background,
-    alignItems: 'center',
     justifyContent: 'center',
-    padding: 20,
+    alignItems: 'center',
   },
   errorText: {
-    fontSize: 18,
-    fontFamily: 'Inter_400Regular',
-    color: colors.text,
-    textAlign: 'center',
-    marginBottom: 20,
+    fontSize: 16,
+    color: colors.error,
   },
 });

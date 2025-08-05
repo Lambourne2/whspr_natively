@@ -5,7 +5,7 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
-  KeyboardAvoidingView,
+  KeyboardAvoidingView, 
   Platform,
 } from 'react-native';
 import Slider from '@react-native-community/slider';
@@ -15,6 +15,9 @@ import { Feather } from '@expo/vector-icons'; // For back arrow
 import Header from '../components/Header';
 import Button from '../components/Button';
 import { commonStyles, colors } from '../styles/commonStyles';
+
+const INTERRUPTION_MODE_IOS_MIX_WITH_OTHERS = 1;
+const INTERRUPTION_MODE_ANDROID_DUCK_OTHERS = 1;
 
 const AUDIO_TRACKS = [
   { name: '48hz Theta Waves', file: require('../assets/audio/48hzThetaWaves.mp3') },
@@ -68,7 +71,7 @@ export default function CreateTrackScreen() {
     async (track: AudioTrack) => {
       try {
         if (audioPlaybackRef.current) {
-          await audioPlaybackRef.current.stopAsync();
+          await audioPlaybackRef.current.setVolumeAsync(backingTrackVolume * 0.3);
           await audioPlaybackRef.current.unloadAsync();
           audioPlaybackRef.current = null;
         }
@@ -97,79 +100,69 @@ export default function CreateTrackScreen() {
     }
   }, []);
 
-  const startRecording = async () => {
-    try {
-      const permission = await Audio.requestPermissionsAsync();
-      if (!permission.granted) {
-        alert('Please grant audio recording permissions.');
-        return;
+  // 1. Pause backing track when starting recording
+const startRecording = async () => {
+  try {
+    // Request permissions etc (your existing code)...
+    
+    // Pause backing audio if playing
+    if (audioPlaybackRef.current) {
+      await audioPlaybackRef.current.pauseAsync();
+    }
+
+    // Continue your recording start code here...
+  } catch (err) {
+    console.error('Failed to start recording', err);
+  }
+};
+
+// 2. Resume backing track after recording stops
+const stopRecording = async () => {
+  try {
+    if (!recording) return;
+    await recording.stopAndUnloadAsync();
+    const uri = recording.getURI();
+    setRecordedURI(uri);
+    setRecording(null);
+
+    // Resume backing audio if paused
+    if (audioPlaybackRef.current) {
+      await audioPlaybackRef.current.playAsync();
+    }
+  } catch (err) {
+    console.error('Failed to stop recording', err);
+  }
+};
+
+// 3. Play recorded voice + backing audio together
+const playRecording = async () => {
+  if (!recordedURI) return;
+
+  try {
+    // Play backing audio if not playing
+    if (audioPlaybackRef.current) {
+      const status = await audioPlaybackRef.current.getStatusAsync();
+      if (status.isLoaded && status.isPlaying) {
+        await audioPlaybackRef.current.playAsync();
       }
-
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
-      });
-
-      const newRecording = new Audio.Recording();
-
-      await newRecording.prepareToRecordAsync({
-        android: {
-          extension: '.m4a',
-          outputFormat: 2,
-          audioEncoder: 3,
-          sampleRate: 44100,
-          numberOfChannels: 2,
-          bitRate: 128000,
-        },
-        ios: {
-          extension: '.caf',
-          audioQuality: 0,
-          sampleRate: 44100,
-          numberOfChannels: 2,
-          bitRate: 128000,
-          linearPCMBitDepth: 16,
-          linearPCMIsBigEndian: false,
-          linearPCMIsFloat: false,
-        },
-        web: {},
-      });
-
-      await newRecording.startAsync();
-      setRecording(newRecording);
-      setRecordedURI(null);
-    } catch (err) {
-      console.error('Failed to start recording', err);
+      await audioPlaybackRef.current.setVolumeAsync(backingTrackVolume);
     }
-  };
 
-  const stopRecording = async () => {
-    try {
-      if (!recording) return;
-      await recording.stopAndUnloadAsync();
-      const uri = recording.getURI();
-      setRecordedURI(uri);
-      setRecording(null);
-    } catch (err) {
-      console.error('Failed to stop recording', err);
+    // Play recorded voice on top
+    if (recordedSound) {
+      await recordedSound.unloadAsync();
     }
-  };
+    const { sound } = await Audio.Sound.createAsync({ uri: recordedURI });
+    setRecordedSound(sound);
+    await sound.setVolumeAsync(affirmationVolume);
+    await sound.playAsync();
 
-  const playRecording = async () => {
-    if (!recordedURI) return;
-
-    try {
-      if (recordedSound) {
-        await recordedSound.unloadAsync();
-      }
-      const { sound } = await Audio.Sound.createAsync({ uri: recordedURI });
-      setRecordedSound(sound);
-      await sound.setVolumeAsync(affirmationVolume);
-      await sound.playAsync();
-    } catch (err) {
-      console.error('Failed to play recording', err);
-    }
-  };
-
+    // Optional: You might want to sync start times here for better alignment
+  } catch (err) {
+    console.error('Failed to play recording', err);
+  }
+};
+  
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}

@@ -15,10 +15,10 @@ import Slider from '@react-native-community/slider';
 import { useFonts, Inter_400Regular, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
 import { colors } from '../styles/commonStyles';
 import { useAffirmationStore } from '@/store/affirmationStore';
-
 import { useSettingsStore } from '@/store/settingsStore';
 import { audioService } from '@/services/audioService';
 import { audioAssets } from '@/assets/audio/audioAssets';
+import { Asset } from 'expo-asset';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -47,6 +47,21 @@ export default function SampleTracksPlayerScreen() {
   } = useAffirmationStore();
 
   const { settings } = useSettingsStore();
+
+  // Helper to get URI string from audioAssets module number or string
+  const getAudioUri = async (assetModule: number | string | undefined): Promise<string> => {
+    if (!assetModule) return '';
+    if (typeof assetModule === 'number') {
+      const asset = Asset.fromModule(assetModule);
+      if (!asset.localUri) {
+        await asset.downloadAsync();
+      }
+      return asset.localUri || asset.uri || '';
+    } else if (typeof assetModule === 'string') {
+      return assetModule;
+    }
+    return '';
+  };
 
   const startProgressTracking = () => {
     if (progressInterval.current) {
@@ -77,16 +92,24 @@ export default function SampleTracksPlayerScreen() {
           setIsLoading(true);
           setCurrentAffirmation(affirmation);
           try {
-            const audioSource = audioAssets[affirmation.audioUri]?.asset;
-            if (!audioSource) {
+            const audioSourceModule = audioAssets[affirmation.audioUri]?.asset;
+            const affirmationUri = await getAudioUri(audioSourceModule);
+
+            if (!affirmationUri) {
               Alert.alert('Error', 'Could not find the selected audio track.');
               setIsLoading(false);
               return;
             }
 
-            await audioService.loadAffirmationAudio(audioSource);
-            await audioService.play(affirmationVolume, 0, settings.fadeInDuration); // No backing track volume
+            await audioService.playAudio({
+              affirmationUri,
+              backingTrackUri: '', // no backing track for sample player
+              affirmationVolume,
+              backingTrackVolume: 0,
+              fadeInDurationMs: settings.fadeInDuration,
+            });
             setIsPlaybackActive(true);
+
             const status = await audioService.getStatus();
             if (status) {
               setDuration(status.duration);
@@ -102,15 +125,14 @@ export default function SampleTracksPlayerScreen() {
       }
     };
     loadInitialAffirmation();
-  }, [id, affirmations, setCurrentAffirmation, settings.fadeInDuration]);
+  }, [id, affirmations, setCurrentAffirmation, affirmationVolume, settings.fadeInDuration]);
 
   useEffect(() => {
     return () => {
       if (progressInterval.current) {
         clearInterval(progressInterval.current);
       }
-      // Call stop to ensure fade-out and cleanup
-      audioService.stop(settings.fadeOutDuration);
+      audioService.stopAll(settings.fadeOutDuration).catch(console.error);
     };
   }, [settings.fadeOutDuration]);
 
@@ -135,18 +157,40 @@ export default function SampleTracksPlayerScreen() {
 
   const handlePlayPause = async () => {
     if (isPlaybackActive) {
-      await audioService.pause();
+      await audioService.pauseAll();
       setIsPlaybackActive(false);
     } else {
-      await audioService.play(affirmationVolume, 0, settings.fadeInDuration); // No backing track
-      setIsPlaybackActive(true);
+      try {
+        const audioSourceModule = audioAssets[currentAffirmation.audioUri]?.asset;
+        const affirmationUri = await getAudioUri(audioSourceModule);
+        if (!affirmationUri) {
+          Alert.alert('Error', 'Audio asset missing or invalid');
+          return;
+        }
+        await audioService.playAudio({
+          affirmationUri,
+          backingTrackUri: '',
+          affirmationVolume,
+          backingTrackVolume: 0,
+          fadeInDurationMs: settings.fadeInDuration,
+        });
+        setIsPlaybackActive(true);
+        startProgressTracking();
+      } catch (error) {
+        console.error('Error playing audio:', error);
+        Alert.alert('Error', 'Failed to play audio');
+      }
     }
   };
 
   const handleStop = async () => {
-    await audioService.stop(settings.fadeOutDuration);
-    setIsPlaybackActive(false);
-    router.back();
+    try {
+      await audioService.stopAll(settings.fadeOutDuration);
+      setIsPlaybackActive(false);
+      router.back();
+    } catch (error) {
+      console.error('Error stopping audio:', error);
+    }
   };
 
   const handleVolumeChange = async (volume: number) => {
@@ -163,14 +207,14 @@ export default function SampleTracksPlayerScreen() {
   const renderWaveform = () => {
     const progress = duration > 0 ? currentTime / duration : 0;
     const waveformBars = 50;
-    
+
     return (
       <View style={styles.waveformContainer}>
         {Array.from({ length: waveformBars }).map((_, index) => {
           const barProgress = index / waveformBars;
           const isActive = barProgress <= progress;
           const height = Math.random() * 30 + 10; // Random height for visual effect
-          
+
           return (
             <View
               key={index}
@@ -212,7 +256,7 @@ export default function SampleTracksPlayerScreen() {
           >
             <Ionicons name="musical-notes" size={60} color={colors.text} />
           </LinearGradient>
-          
+
           <Text style={[styles.affirmationTitle, { fontFamily: 'Inter_700Bold' }]}>
             {currentAffirmation.title}
           </Text>
@@ -239,7 +283,7 @@ export default function SampleTracksPlayerScreen() {
           >
             <Ionicons name="stop" size={32} color={!isPlaybackActive ? colors.textSecondary : colors.text} />
           </TouchableOpacity>
-          
+
           <TouchableOpacity
             style={[styles.playButton, isLoading && styles.disabledButton]}
             onPress={handlePlayPause}
