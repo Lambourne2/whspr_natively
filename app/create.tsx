@@ -9,12 +9,11 @@ import {
   Platform,
 } from 'react-native';
 import Slider from '@react-native-community/slider';
-import { Audio } from 'expo-av';  // Audio includes RECORDING_OPTIONS_PRESET_HIGH_QUALITY
+import { Audio } from 'expo-av';
 import { useRouter } from 'expo-router';
 import Header from '../components/Header';
 import Button from '../components/Button';
 import { commonStyles, colors } from '../styles/commonStyles';
-
 
 const AUDIO_TRACKS = [
   { name: '48hz Theta Waves', file: require('../assets/audio/48hzThetaWaves.mp3') },
@@ -26,29 +25,6 @@ const AUDIO_TRACKS = [
 ];
 
 type AudioTrack = typeof AUDIO_TRACKS[number];
-
-const recordingOptions = {
-  android: {
-    extension: '.m4a',
-    outputFormat: 2, // MPEG_4
-    audioEncoder: 3, // AAC
-    sampleRate: 44100,
-    numberOfChannels: 2,
-    bitRate: 128000,
-  },
-  ios: {
-    extension: '.caf',
-    audioQuality: 127, // High
-    sampleRate: 44100,
-    numberOfChannels: 2,
-    bitRate: 128000,
-    linearPCMBitDepth: 16,
-    linearPCMIsBigEndian: false,
-    linearPCMIsFloat: false,
-  },
-  isMeteringEnabled: true,
-};
-
 
 export default function CreateTrackScreen() {
   const router = useRouter();
@@ -95,20 +71,13 @@ export default function CreateTrackScreen() {
           await audioPlaybackRef.current.unloadAsync();
           audioPlaybackRef.current = null;
         }
-
         const { sound } = await Audio.Sound.createAsync(track.file, {
           shouldPlay: true,
           isLooping: true,
         });
-
         audioPlaybackRef.current = sound;
-
-        // Boost backing track volume for better loudness
-        const boostedVolume = Math.min(1, backingTrackVolume * 1.6);
-        await sound.setVolumeAsync(boostedVolume);
-
+        await sound.setVolumeAsync(backingTrackVolume);
         await sound.playAsync();
-
         setSelectedTrack(track.name);
       } catch (error) {
         console.error('Error toggling audio:', error);
@@ -129,9 +98,9 @@ export default function CreateTrackScreen() {
 
   const startRecording = async () => {
     try {
-      const { granted } = await Audio.requestPermissionsAsync();
-      if (!granted) {
-        console.warn('Microphone permission not granted');
+      const permission = await Audio.requestPermissionsAsync();
+      if (!permission.granted) {
+        alert('Please grant audio recording permissions.');
         return;
       }
 
@@ -141,18 +110,19 @@ export default function CreateTrackScreen() {
       });
 
       const newRecording = new Audio.Recording();
-      const recordingOptions = {
+
+      await newRecording.prepareToRecordAsync({
         android: {
           extension: '.m4a',
-          outputFormat: 2, // MPEG_4
-          audioEncoder: 3, // AAC
+          outputFormat: 2,
+          audioEncoder: 3,
           sampleRate: 44100,
           numberOfChannels: 2,
           bitRate: 128000,
         },
         ios: {
           extension: '.caf',
-          audioQuality: 127, // High quality
+          audioQuality: 0,
           sampleRate: 44100,
           numberOfChannels: 2,
           bitRate: 128000,
@@ -160,9 +130,10 @@ export default function CreateTrackScreen() {
           linearPCMIsBigEndian: false,
           linearPCMIsFloat: false,
         },
-        isMeteringEnabled: true,
-      };      await newRecording.startAsync();
+        web:{},
+      });
 
+      await newRecording.startAsync();
       setRecording(newRecording);
       setRecordedURI(null);
     } catch (err) {
@@ -171,9 +142,8 @@ export default function CreateTrackScreen() {
   };
 
   const stopRecording = async () => {
-    if (!recording) return;
-
     try {
+      if (!recording) return;
       await recording.stopAndUnloadAsync();
       const uri = recording.getURI();
       setRecordedURI(uri);
@@ -192,11 +162,7 @@ export default function CreateTrackScreen() {
       }
       const { sound } = await Audio.Sound.createAsync({ uri: recordedURI });
       setRecordedSound(sound);
-
-      // Boost playback volume for loudness
-      const boostedVolume = Math.min(1, affirmationVolume * 2);
-      await sound.setVolumeAsync(boostedVolume);
-
+      await sound.setVolumeAsync(affirmationVolume);
       await sound.playAsync();
     } catch (err) {
       console.error('Failed to play recording', err);
@@ -209,11 +175,8 @@ export default function CreateTrackScreen() {
       style={[commonStyles.container, { paddingHorizontal: 16 }]}
     >
       <ScrollView showsVerticalScrollIndicator={false}>
-        <Header
-          title="Create Track"
-          subtitle="Build your personalized sleep journey"
-        />
-  
+        <Header title="Create Track" subtitle="Build your personalized sleep journey" />
+
         <TextInput
           placeholder="Enter track title"
           value={title}
@@ -221,7 +184,7 @@ export default function CreateTrackScreen() {
           style={commonStyles.input}
           accessibilityLabel="Track title input"
         />
-  
+
         <Text style={commonStyles.subtitle}>Select Backing Track</Text>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
           {AUDIO_TRACKS.map((track) => (
@@ -243,7 +206,7 @@ export default function CreateTrackScreen() {
             </TouchableOpacity>
           ))}
         </View>
-  
+
         <Text style={[commonStyles.subtitle, { marginTop: 24 }]}>Affirmations</Text>
         <TextInput
           placeholder="Write your own affirmations..."
@@ -256,17 +219,11 @@ export default function CreateTrackScreen() {
         <Text style={commonStyles.textMuted}>
           Write your own affirmations above. You can use AI Voice to speak it or record your own voice.
         </Text>
-  
+
         <View style={{ flexDirection: 'row', justifyContent: 'space-around', marginVertical: 16 }}>
           <Button
             text="AI Voice"
-            onPress={() => {
-              toggleSwitch('ai');
-              router.push({
-                pathname: '/ai-voice-select',
-                params: { affirmationText },
-              });
-            }}
+            onPress={() => toggleSwitch('ai')}
             variant={aiVoiceEnabled ? 'primary' : 'secondary'}
             style={{ paddingVertical: 6, paddingHorizontal: 12 }}
           />
@@ -283,7 +240,7 @@ export default function CreateTrackScreen() {
             style={{ paddingVertical: 6, paddingHorizontal: 12 }}
           />
         </View>
-  
+
         {voiceRecordEnabled && (
           <View style={{ alignItems: 'center', gap: 10, marginBottom: 20 }}>
             {!recording ? (
@@ -296,7 +253,7 @@ export default function CreateTrackScreen() {
             )}
           </View>
         )}
-  
+
         <Text style={commonStyles.subtitle}>Affirmation Volume</Text>
         <Slider
           minimumValue={0}
@@ -306,7 +263,7 @@ export default function CreateTrackScreen() {
           onValueChange={setAffirmationVolume}
           accessibilityLabel="Adjust affirmation volume"
         />
-  
+
         <Text style={commonStyles.subtitle}>Backing Track Volume</Text>
         <Slider
           minimumValue={0}
@@ -316,7 +273,7 @@ export default function CreateTrackScreen() {
           onValueChange={setBackingTrackVolume}
           accessibilityLabel="Adjust backing track volume"
         />
-  
+
         <Text style={commonStyles.subtitle}>Duration: {duration} min</Text>
         <Slider
           minimumValue={1}
@@ -326,7 +283,7 @@ export default function CreateTrackScreen() {
           onValueChange={setDuration}
           accessibilityLabel="Set track duration in minutes"
         />
-  
+
         <Button
           text="Create Track"
           onPress={() => console.log('Saving...')}
@@ -336,4 +293,4 @@ export default function CreateTrackScreen() {
       </ScrollView>
     </KeyboardAvoidingView>
   );
-}  
+}

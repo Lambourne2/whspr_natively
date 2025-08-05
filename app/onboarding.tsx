@@ -23,7 +23,7 @@ const ONBOARDING_SLIDES = [
     title: 'Welcome to Whspr',
     subtitle: 'Your Personal Sleep Affirmation Studio',
     description: 'Create custom affirmations with AI and soothing backing tracks for peaceful sleep and positive transformation.',
-    gradient: [colors.primary, colors.secondary],
+    gradient: [colors.primary, colors.secondary] as const,
   },
   {
     id: 2,
@@ -31,7 +31,7 @@ const ONBOARDING_SLIDES = [
     title: 'AI-Powered Affirmations',
     subtitle: 'Personalized Just for You',
     description: 'Our AI creates unique affirmations based on your intentions, tone preferences, and personal goals.',
-    gradient: [colors.secondary, '#8B5CF6'],
+    gradient: [colors.secondary, '#8B5CF6'] as const,
   },
   {
     id: 3,
@@ -39,7 +39,7 @@ const ONBOARDING_SLIDES = [
     title: 'Healing Sound Frequencies',
     subtitle: 'Science-Backed Audio',
     description: 'Choose from Delta, Theta, Alpha waves and Solfeggio frequencies (432Hz, 528Hz, 852Hz) for deeper relaxation.',
-    gradient: ['#8B5CF6', '#EC4899'],
+    gradient: ['#8B5CF6', '#EC4899'] as const,
   },
   {
     id: 4,
@@ -47,7 +47,7 @@ const ONBOARDING_SLIDES = [
     title: 'Works Offline',
     subtitle: 'Always Available',
     description: 'Once created, your affirmations work completely offline. No internet required for your nightly routine.',
-    gradient: ['#EC4899', '#F59E0B'],
+    gradient: ['#EC4899', '#F59E0B'] as const,
   },
   {
     id: 5,
@@ -55,7 +55,7 @@ const ONBOARDING_SLIDES = [
     title: 'Privacy First',
     subtitle: 'Your Data Stays Private',
     description: 'All your affirmations are stored locally on your device. We never store or share your personal content.',
-    gradient: ['#F59E0B', colors.primary],
+    gradient: ['#F59E0B', colors.primary] as const,
   },
 ];
 
@@ -105,7 +105,7 @@ export default function OnboardingScreen() {
     <View key={slide.id} style={[styles.slide, { width: screenWidth }]}>
       <View style={styles.slideContent}>
         <LinearGradient
-          colors={slide.gradient}
+          colors={slide.gradient} // now correctly typed readonly [string, string]
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.iconContainer}
@@ -284,4 +284,3 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 });
-
