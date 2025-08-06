@@ -50,7 +50,14 @@ export const useSettingsStore = create<SettingsStore>()(
         })),
 
       resetSettings: () =>
-        set({ settings: defaultSettings }),
+        set((state) => ({
+          settings: {
+            ...defaultSettings,
+            // Preserve API keys on reset as the UI message promises
+            openRouterApiKey: state.settings.openRouterApiKey,
+            elevenLabsApiKey: state.settings.elevenLabsApiKey,
+          },
+        })),
 
       clearCache: () => {
         // This will be implemented to clear audio cache and temporary files

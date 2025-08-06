@@ -18,6 +18,8 @@ import Card from '../components/Card';
 import Header from '../components/Header';
 import { useAffirmationStore } from '../store/affirmationStore';
 import { generateAffirmation } from '../services/aiService';
+import { useSettingsStore } from '../store/settingsStore';
+import { apiService } from '../services/apiService';
 
 const AI_INTENTIONS = [
   'Sleep Better Tonight',
@@ -65,6 +67,7 @@ export default function AIGenerateScreen() {
   const [generatedPreview, setGeneratedPreview] = useState<string[]>([]);
 
   const { addAffirmation } = useAffirmationStore();
+  const { settings } = useSettingsStore();
 
   if (!fontsLoaded) {
     return null;
@@ -76,13 +79,29 @@ export default function AIGenerateScreen() {
       return;
     }
 
+    if (!settings.openRouterApiKey) {
+      Alert.alert('OpenRouter Key Required', 'Please add your OpenRouter API key in Settings > API Keys.');
+      return;
+    }
+    if (!settings.elevenLabsApiKey) {
+      Alert.alert('ElevenLabs Key Required', 'Please add your ElevenLabs API key in Settings > API Keys.');
+      return;
+    }
+
     setIsGenerating(true);
     try {
+      const quota = await apiService.checkQuota();
+      if (quota && quota.remaining < settings.elevenLabsQuotaThreshold) {
+        Alert.alert(
+          'Low ElevenLabs Quota',
+          `You have ${quota.remaining} of ${quota.total} characters remaining. Consider topping up to avoid failures.`,
+        );
+      }
       // Use real AI service instead of mock
       const affirmationData = {
         intention: selectedIntention,
         tone: selectedPersonality,
-        voice: 'female-soft',
+        voice: settings.defaultVoice,
         customText: customContext,
       };
 
@@ -102,12 +121,17 @@ export default function AIGenerateScreen() {
       return;
     }
 
+    if (!settings.openRouterApiKey || !settings.elevenLabsApiKey) {
+      Alert.alert('Missing API Keys', 'Please configure your API keys in Settings > API Keys.');
+      return;
+    }
+
     setIsGenerating(true);
     try {
       const affirmationData = {
         intention: selectedIntention,
         tone: selectedPersonality,
-        voice: 'female-soft', // Default voice for AI generation
+        voice: settings.defaultVoice, // Use app default voice
         customText: customContext,
       };
 
@@ -119,8 +143,8 @@ export default function AIGenerateScreen() {
         date: new Date().toISOString().split('T')[0] || new Date().toISOString(),
         intent: selectedIntention,
         tone: selectedPersonality,
-        voice: 'female-soft',
-        loopGap: 3,
+        voice: settings.defaultVoice,
+        loopGap: settings.defaultLoopGap,
         audioUri: generatedAffirmation.audioUri,
         duration: `${selectedDuration}:00`,
         plays: 0,
