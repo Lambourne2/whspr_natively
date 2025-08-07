@@ -47,13 +47,25 @@ export default function CreateTrackScreen() {
   const [recordedSound, setRecordedSound] = useState<Audio.Sound | null>(null);
 
   const audioPlaybackRef = useRef<Audio.Sound | null>(null);
+  const recordedPlaybackRef = useRef<Audio.Sound | null>(null);
+
+  const [isBackingPlaying, setIsBackingPlaying] = useState(false);
+  const [isRecordedPlaying, setIsRecordedPlaying] = useState(false);
+  const [recordedDuration, setRecordedDuration] = useState(0);
+  const [recordedPosition, setRecordedPosition] = useState(0);
 
   useEffect(() => {
     return () => {
+      // Cleanup all sounds on unmount
       if (audioPlaybackRef.current) {
         audioPlaybackRef.current.stopAsync().catch(() => {});
         audioPlaybackRef.current.unloadAsync().catch(() => {});
         audioPlaybackRef.current = null;
+      }
+      if (recordedPlaybackRef.current) {
+        recordedPlaybackRef.current.stopAsync().catch(() => {});
+        recordedPlaybackRef.current.unloadAsync().catch(() => {});
+        recordedPlaybackRef.current = null;
       }
       if (recordedSound) {
         recordedSound.unloadAsync().catch(() => {});
@@ -67,28 +79,207 @@ export default function CreateTrackScreen() {
     }
   }, [backingTrackVolume]);
 
+  // --- Play/Pause Backing Track ---
   const toggleAudio = useCallback(
     async (track: AudioTrack) => {
       try {
+        // If same track selected again, pause it
+        if (selectedTrack === track.name && audioPlaybackRef.current) {
+          const status = await audioPlaybackRef.current.getStatusAsync();
+          if (status.isPlaying) {
+            await audioPlaybackRef.current.pauseAsync();
+            setIsBackingPlaying(false);
+            return;
+          } else {
+            await audioPlaybackRef.current.playAsync();
+            setIsBackingPlaying(true);
+            return;
+          }
+        }
+
+        // New track selected - unload existing backing audio if any
         if (audioPlaybackRef.current) {
-          await audioPlaybackRef.current.setVolumeAsync(backingTrackVolume * 0.3);
+          await audioPlaybackRef.current.stopAsync();
           await audioPlaybackRef.current.unloadAsync();
           audioPlaybackRef.current = null;
         }
         const { sound } = await Audio.Sound.createAsync(track.file, {
           shouldPlay: true,
           isLooping: true,
+          volume: backingTrackVolume,
         });
         audioPlaybackRef.current = sound;
-        await sound.setVolumeAsync(backingTrackVolume);
+
+        // Listen for playback status to update play/pause button UI
+        sound.setOnPlaybackStatusUpdate((status) => {
+          setIsBackingPlaying(status.isPlaying ?? false);
+        });
+
         await sound.playAsync();
         setSelectedTrack(track.name);
       } catch (error) {
         console.error('Error toggling audio:', error);
       }
     },
-    [backingTrackVolume]
+    [backingTrackVolume, selectedTrack]
   );
+
+  const pauseBacking = async () => {
+    if (audioPlaybackRef.current) {
+      const status = await audioPlaybackRef.current.getStatusAsync();
+      if (status.isPlaying) {
+        await audioPlaybackRef.current.pauseAsync();
+        setIsBackingPlaying(false);
+      }
+    }
+  };
+
+  // --- Recording functions ---
+  const startRecording = async () => {
+    try {
+      const permission = await Audio.requestPermissionsAsync();
+      if (permission.status !== 'granted') {
+        alert('Permission to access microphone is required!');
+        return;
+      }
+
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        interruptionModeIOS: INTERRUPTION_MODE_IOS_MIX_WITH_OTHERS,
+        playsInSilentModeIOS: true,
+        shouldDuckAndroid: true,
+        interruptionModeAndroid: INTERRUPTION_MODE_ANDROID_DUCK_OTHERS,
+        playThroughEarpieceAndroid: false,
+        staysActiveInBackground: true,
+      });
+
+      // Pause backing audio if playing
+      if (audioPlaybackRef.current) {
+        await audioPlaybackRef.current.pauseAsync();
+        setIsBackingPlaying(false);
+      }
+
+      const { recording } = await Audio.Recording.createAsync(
+        Audio.RECORDING_OPTIONS_PRESET_HIGH_QUALITY
+      );
+      setRecording(recording);
+    } catch (err) {
+      console.error('Failed to start recording', err);
+    }
+  };
+
+  const stopRecording = async () => {
+    try {
+      if (!recording) return;
+      await recording.stopAndUnloadAsync();
+      const uri = recording.getURI();
+      setRecordedURI(uri || null);
+      setRecording(null);
+
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+        interruptionModeIOS: INTERRUPTION_MODE_IOS_MIX_WITH_OTHERS,
+        playsInSilentModeIOS: true,
+        shouldDuckAndroid: true,
+        interruptionModeAndroid: INTERRUPTION_MODE_ANDROID_DUCK_OTHERS,
+        playThroughEarpieceAndroid: false,
+        staysActiveInBackground: true,
+      });
+
+      // Prepare recorded playback instance
+      if (recordedPlaybackRef.current) {
+        await recordedPlaybackRef.current.unloadAsync();
+        recordedPlaybackRef.current = null;
+      }
+      if (uri) {
+        const { sound } = await Audio.Sound.createAsync({ uri });
+        recordedPlaybackRef.current = sound;
+
+        // Update recorded audio duration
+        const status = await sound.getStatusAsync();
+        setRecordedDuration(status.durationMillis ?? 0);
+        setRecordedPosition(0);
+
+        // Listen for playback position update to sync slider
+        sound.setOnPlaybackStatusUpdate((status) => {
+          if (!status.isLoaded) return;
+          setRecordedPosition(status.positionMillis);
+          setIsRecordedPlaying(status.isPlaying ?? false);
+
+          // Stop updating position after finished
+          if (status.didJustFinish) {
+            setIsRecordedPlaying(false);
+            setRecordedPosition(status.durationMillis ?? 0);
+          }
+        });
+      }
+
+      // Resume backing audio if selected
+      if (audioPlaybackRef.current && selectedTrack) {
+        await audioPlaybackRef.current.playAsync();
+        setIsBackingPlaying(true);
+      }
+    } catch (err) {
+      console.error('Failed to stop recording', err);
+    }
+  };
+
+  // Play both backing and recorded audio from start together, synced
+  const playRecording = async () => {
+    if (!recordedURI) return;
+
+    try {
+      // Restart backing track from start
+      if (audioPlaybackRef.current) {
+        await audioPlaybackRef.current.setPositionAsync(0);
+        await audioPlaybackRef.current.playAsync();
+        setIsBackingPlaying(true);
+      }
+
+      // Restart recorded voice from start
+      if (recordedPlaybackRef.current) {
+        await recordedPlaybackRef.current.setPositionAsync(0);
+        await recordedPlaybackRef.current.playAsync();
+        setIsRecordedPlaying(true);
+      }
+    } catch (err) {
+      console.error('Failed to play recording', err);
+    }
+  };
+
+  // Pause recorded voice and backing together
+  const pauseAllAudio = async () => {
+    if (audioPlaybackRef.current) {
+      await audioPlaybackRef.current.pauseAsync();
+      setIsBackingPlaying(false);
+    }
+    if (recordedPlaybackRef.current) {
+      await recordedPlaybackRef.current.pauseAsync();
+      setIsRecordedPlaying(false);
+    }
+  };
+
+  // Seek recorded voice audio via slider
+  const seekRecorded = async (value: number) => {
+    if (recordedPlaybackRef.current) {
+      await recordedPlaybackRef.current.setPositionAsync(value);
+      setRecordedPosition(value);
+    }
+  };
+
+  // Reset recording (delete current recorded URI & unload playback)
+  const resetRecording = async () => {
+    if (recordedPlaybackRef.current) {
+      await recordedPlaybackRef.current.stopAsync();
+      await recordedPlaybackRef.current.unloadAsync();
+      recordedPlaybackRef.current = null;
+    }
+    setRecordedURI(null);
+    setRecordedSound(null);
+    setRecordedDuration(0);
+    setRecordedPosition(0);
+    setIsRecordedPlaying(false);
+  };
 
   const toggleSwitch = useCallback((type: 'ai' | 'record') => {
     if (type === 'ai') {
@@ -100,69 +291,6 @@ export default function CreateTrackScreen() {
     }
   }, []);
 
-  // 1. Pause backing track when starting recording
-const startRecording = async () => {
-  try {
-    // Request permissions etc (your existing code)...
-    
-    // Pause backing audio if playing
-    if (audioPlaybackRef.current) {
-      await audioPlaybackRef.current.pauseAsync();
-    }
-
-    // Continue your recording start code here...
-  } catch (err) {
-    console.error('Failed to start recording', err);
-  }
-};
-
-// 2. Resume backing track after recording stops
-const stopRecording = async () => {
-  try {
-    if (!recording) return;
-    await recording.stopAndUnloadAsync();
-    const uri = recording.getURI();
-    setRecordedURI(uri);
-    setRecording(null);
-
-    // Resume backing audio if paused
-    if (audioPlaybackRef.current) {
-      await audioPlaybackRef.current.playAsync();
-    }
-  } catch (err) {
-    console.error('Failed to stop recording', err);
-  }
-};
-
-// 3. Play recorded voice + backing audio together
-const playRecording = async () => {
-  if (!recordedURI) return;
-
-  try {
-    // Play backing audio if not playing
-    if (audioPlaybackRef.current) {
-      const status = await audioPlaybackRef.current.getStatusAsync();
-      if (status.isLoaded && status.isPlaying) {
-        await audioPlaybackRef.current.playAsync();
-      }
-      await audioPlaybackRef.current.setVolumeAsync(backingTrackVolume);
-    }
-
-    // Play recorded voice on top
-    if (recordedSound) {
-      await recordedSound.unloadAsync();
-    }
-    const { sound } = await Audio.Sound.createAsync({ uri: recordedURI });
-    setRecordedSound(sound);
-    await sound.setVolumeAsync(affirmationVolume);
-    await sound.playAsync();
-
-    // Optional: You might want to sync start times here for better alignment
-  } catch (err) {
-    console.error('Failed to play recording', err);
-  }
-};
-  
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -253,6 +381,25 @@ const playRecording = async () => {
           ))}
         </View>
 
+        {/* Backing track play/pause button */}
+        {selectedTrack && (
+          <View style={{ flexDirection: 'row', justifyContent: 'center', marginBottom: 20 }}>
+            <Button
+              text={isBackingPlaying ? 'Pause Backing Track' : 'Play Backing Track'}
+              onPress={async () => {
+                if (isBackingPlaying) {
+                  await pauseBacking();
+                } else if (audioPlaybackRef.current) {
+                  await audioPlaybackRef.current.playAsync();
+                  setIsBackingPlaying(true);
+                }
+              }}
+              variant="secondary"
+              style={{ paddingVertical: 6, paddingHorizontal: 12 }}
+            />
+          </View>
+        )}
+
         {/* Affirmations Input */}
         <Text style={[commonStyles.subtitle, { marginTop: 24 }]}>Affirmations</Text>
         <TextInput
@@ -298,7 +445,30 @@ const playRecording = async () => {
               <Button text="Stop Recording" onPress={stopRecording} variant="secondary" />
             )}
             {recordedURI && (
-              <Button text="Play Recording" onPress={playRecording} variant="secondary" />
+              <>
+                <Button text={isRecordedPlaying ? "Pause Recording Playback" : "Play Recording"} onPress={() => {
+                  if (isRecordedPlaying) {
+                    pauseAllAudio();
+                  } else {
+                    playRecording();
+                  }
+                }} variant="secondary" />
+                {/* Seek bar for recorded voice */}
+                <Slider
+                  minimumValue={0}
+                  maximumValue={recordedDuration}
+                  step={1000}
+                  value={recordedPosition}
+                  onValueChange={seekRecorded}
+                  style={{ width: '90%', marginTop: 10 }}
+                  accessibilityLabel="Seek recorded voice"
+                />
+                <View style={{ flexDirection: 'row', justifyContent: 'space-around', width: '90%', marginTop: 10 }}>
+                  <Button text="Restart Recording" onPress={resetRecording} variant="secondary" />
+                  {/* Placeholder for Trim functionality - can implement later */}
+                  {/* <Button text="Trim" onPress={() => {}} variant="secondary" /> */}
+                </View>
+              </>
             )}
           </View>
         )}
@@ -320,7 +490,12 @@ const playRecording = async () => {
           maximumValue={1}
           step={0.05}
           value={backingTrackVolume}
-          onValueChange={setBackingTrackVolume}
+          onValueChange={async (value) => {
+            setBackingTrackVolume(value);
+            if (audioPlaybackRef.current) {
+              await audioPlaybackRef.current.setVolumeAsync(value);
+            }
+          }}
           accessibilityLabel="Adjust backing track volume"
         />
 
