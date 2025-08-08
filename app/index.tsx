@@ -101,7 +101,7 @@ export default function HomeScreen() {
 
         <Button 
           text="Settings"
-          onPress={() => router.push('/voice-settings')}
+          onPress={() => router.push('/settings')}
           variant="secondary"
           style={styles.settingsButton}
         />

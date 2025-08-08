@@ -8,6 +8,7 @@ import {
   Alert,
   Switch,
   StyleSheet,
+  Linking,
   AlertButton,
 } from 'react-native';
 import { router } from 'expo-router';
@@ -18,10 +19,16 @@ import { commonStyles, colors, buttonStyles } from '../styles/commonStyles';
 import { useSettingsStore } from '../store/settingsStore';
 import { useAffirmationStore } from '../store/affirmationStore';
 
-
-
-
 const LOOP_GAP_OPTIONS = [5, 10, 15, 20, 30];
+const DEFAULT_VOICE_OPTIONS = [
+  { id: 'soft_female', label: 'Soft Female' },
+  { id: 'warm_female', label: 'Warm Female' },
+  { id: 'deep_male', label: 'Deep Male' },
+  { id: 'calm_male', label: 'Calm Male' },
+  { id: 'neutral', label: 'Neutral' },
+];
+const MAX_TTS_OPTIONS = [1, 2, 3, 4, 5];
+const ELEVEN_QUOTA_OPTIONS = [500, 1000, 2000, 5000, 10000];
 
 export default function SettingsScreen() {
   const [fontsLoaded] = useFonts({
@@ -32,6 +39,73 @@ export default function SettingsScreen() {
 
   const { settings, updateSettings, resetSettings, clearCache } = useSettingsStore();
   const { affirmations } = useAffirmationStore();
+
+  // Local state for BYOK (OpenRouter)
+  const [showOpenRouterEditor, setShowOpenRouterEditor] = useState(!settings.openRouterApiKey);
+  const [tempOpenRouterKey, setTempOpenRouterKey] = useState(settings.openRouterApiKey || '');
+  const [showOpenRouterKey, setShowOpenRouterKey] = useState(false);
+  const [testingOpenRouterKey, setTestingOpenRouterKey] = useState(false);
+  
+  // Local state for ElevenLabs key editor
+  const [showElevenLabsEditor, setShowElevenLabsEditor] = useState(!settings.elevenLabsApiKey);
+  const [tempElevenLabsKey, setTempElevenLabsKey] = useState(settings.elevenLabsApiKey || '');
+  const [showElevenLabsKey, setShowElevenLabsKey] = useState(false);
+  const [testingElevenLabsKey, setTestingElevenLabsKey] = useState(false);
+
+  const handleTestAndSaveOpenRouterKey = async () => {
+    if (!tempOpenRouterKey || tempOpenRouterKey.trim().length < 10) {
+      Alert.alert('Invalid Key', 'Please enter a valid OpenRouter API key.');
+      return;
+    }
+    try {
+      setTestingOpenRouterKey(true);
+      const response = await fetch('https://openrouter.ai/api/v1/models', {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${tempOpenRouterKey.trim()}`,
+          'Content-Type': 'application/json',
+          'HTTP-Referer': 'https://whspr.app',
+          'X-Title': 'Whspr',
+        },
+      });
+      if (!response.ok) {
+        throw new Error(`Status ${response.status}`);
+      }
+      updateSettings({ openRouterApiKey: tempOpenRouterKey.trim() });
+      Alert.alert('Success', 'OpenRouter API key validated and saved.');
+      setShowOpenRouterEditor(false);
+    } catch (e) {
+      Alert.alert('Key test failed', 'We could not validate this key. Please verify and try again.');
+    } finally {
+      setTestingOpenRouterKey(false);
+    }
+  };
+
+  const handleTestAndSaveElevenLabsKey = async () => {
+    if (!tempElevenLabsKey || tempElevenLabsKey.trim().length < 10) {
+      Alert.alert('Invalid Key', 'Please enter a valid ElevenLabs API key.');
+      return;
+    }
+    try {
+      setTestingElevenLabsKey(true);
+      const response = await fetch('https://api.elevenlabs.io/v1/user', {
+        method: 'GET',
+        headers: {
+          'xi-api-key': tempElevenLabsKey.trim(),
+        },
+      });
+      if (!response.ok) {
+        throw new Error(`Status ${response.status}`);
+      }
+      updateSettings({ elevenLabsApiKey: tempElevenLabsKey.trim() });
+      Alert.alert('Success', 'ElevenLabs API key validated and saved.');
+      setShowElevenLabsEditor(false);
+    } catch (e) {
+      Alert.alert('Key test failed', 'We could not validate this ElevenLabs key. Please verify and try again.');
+    } finally {
+      setTestingElevenLabsKey(false);
+    }
+  };
 
 
 
@@ -143,6 +217,27 @@ export default function SettingsScreen() {
 
 
             {renderSettingItem(
+              'mic',
+              'Default Voice',
+              (DEFAULT_VOICE_OPTIONS.find(v => v.id === settings.defaultVoice)?.label || settings.defaultVoice),
+              <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />,
+              () => {
+                Alert.alert(
+                  'Select Default Voice',
+                  'Preferred voice for generated audio',
+                  DEFAULT_VOICE_OPTIONS.map(
+                    (v) => (
+                      {
+                        text: v.label,
+                        onPress: () => updateSettings({ defaultVoice: v.id }),
+                      } as AlertButton
+                    )
+                  ).concat([{ text: 'Cancel', style: 'cancel', onPress: () => {} }])
+                );
+              }
+            )}
+
+            {renderSettingItem(
               'time',
               'Default Loop Gap',
               `${settings.defaultLoopGap} minutes`,
@@ -205,6 +300,35 @@ export default function SettingsScreen() {
                 );
               }
             )}
+
+            {renderSettingItem(
+              'speedometer',
+              'Max Concurrent TTS',
+              `${settings.maxConcurrentTtsCalls}`,
+              <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />,
+              () => {
+                Alert.alert(
+                  'Max Concurrent TTS Calls',
+                  'Controls parallel text-to-speech requests',
+                  MAX_TTS_OPTIONS.map(
+                    (n) => (
+                      {
+                        text: `${n}`,
+                        onPress: () => updateSettings({ maxConcurrentTtsCalls: n }),
+                      } as AlertButton
+                    )
+                  ).concat([{ text: 'Cancel', style: 'cancel', onPress: () => {} }])
+                );
+              }
+            )}
+
+            {renderSettingItem(
+              'settings',
+              'Voice Settings (Advanced)',
+              'Detailed voice and playback options',
+              <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />,
+              () => router.push('/voice-settings')
+            )}
           </View>
         )}
 
@@ -258,56 +382,160 @@ export default function SettingsScreen() {
               'key',
               'OpenRouter API Key',
               settings.openRouterApiKey ? 'Configured' : 'Not configured',
-              <TouchableOpacity 
-                onPress={() => {
-                  Alert.prompt(
-                    'OpenRouter API Key',
-                    'Enter your OpenRouter API key for text generation:',
-                    [
-                      {
-                        text: 'Cancel',
-                        style: 'cancel',
-                      },
-                      {
-                        text: 'Save',
-                        onPress: (text) => updateSettings({ openRouterApiKey: text || '' }),
-                      },
-                    ],
-                    'plain-text',
-                    settings.openRouterApiKey
-                  );
-                }}
-              >
-                <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
-              </TouchableOpacity>
+              <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />,
+              () => {
+                setTempOpenRouterKey(settings.openRouterApiKey || '');
+                setShowOpenRouterEditor(true);
+              }
+            )}
+
+            {showOpenRouterEditor && (
+              <View style={styles.apiKeyContainer}>
+                <Text style={[styles.apiKeyLabel, { fontFamily: 'Inter_600SemiBold' }]}>OpenRouter API Key</Text>
+                <View style={{ position: 'relative' }}>
+                  <TextInput
+                    style={styles.apiKeyInput}
+                    placeholder="sk-..."
+                    placeholderTextColor={colors.textMuted}
+                    secureTextEntry={!showOpenRouterKey}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    value={tempOpenRouterKey}
+                    onChangeText={setTempOpenRouterKey}
+                  />
+                  <TouchableOpacity
+                    style={{ position: 'absolute', right: 12, top: 14 }}
+                    onPress={() => setShowOpenRouterKey(!showOpenRouterKey)}
+                    accessibilityLabel={showOpenRouterKey ? 'Hide key' : 'Show key'}
+                  >
+                    <Ionicons name={showOpenRouterKey ? 'eye-off' : 'eye'} size={22} color={colors.textSecondary} />
+                  </TouchableOpacity>
+                </View>
+                <Text style={[styles.apiKeyHelp, { fontFamily: 'Inter_400Regular' }]}>Your key is stored on this device and used only for OpenRouter requests.</Text>
+                <TouchableOpacity onPress={() => Linking.openURL('https://openrouter.ai/keys')}>
+                  <Text style={[styles.apiKeyHelp, { color: colors.accent, textDecorationLine: 'underline' }]}>Get an API key: https://openrouter.ai/keys</Text>
+                </TouchableOpacity>
+                <View style={{ flexDirection: 'row', marginTop: 12 }}>
+                  <TouchableOpacity
+                    style={[buttonStyles.primary, { flex: 1 }]}
+                    onPress={handleTestAndSaveOpenRouterKey}
+                    disabled={!tempOpenRouterKey || tempOpenRouterKey.trim().length < 10 || testingOpenRouterKey}
+                  >
+                    <Text style={{ color: colors.text, fontWeight: '600' }}>{testingOpenRouterKey ? 'Testing…' : 'Test & Save'}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[buttonStyles.secondary, { flex: 1, marginLeft: 12 }]}
+                    onPress={() => {
+                      setShowOpenRouterEditor(false);
+                      setTempOpenRouterKey(settings.openRouterApiKey || '');
+                    }}
+                  >
+                    <Text style={{ color: colors.text }}>Cancel</Text>
+                  </TouchableOpacity>
+                </View>
+                {settings.openRouterApiKey ? (
+                  <TouchableOpacity
+                    style={[buttonStyles.ghost, { marginTop: 8 }]}
+                    onPress={() => {
+                      Alert.alert('Remove Key?', 'This will clear your OpenRouter API key.', [
+                        { text: 'Cancel', style: 'cancel' },
+                        { text: 'Remove', style: 'destructive', onPress: () => updateSettings({ openRouterApiKey: '' }) },
+                      ]);
+                    }}
+                  >
+                    <Text style={{ color: colors.error }}>Remove Key</Text>
+                  </TouchableOpacity>
+                ) : null}
+              </View>
             )}
 
             {renderSettingItem(
               'key',
               'ElevenLabs API Key',
               settings.elevenLabsApiKey ? 'Configured' : 'Not configured',
-              <TouchableOpacity 
-                onPress={() => {
-                  Alert.prompt(
-                    'ElevenLabs API Key',
-                    'Enter your ElevenLabs API key for text-to-speech:',
-                    [
+              <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />,
+              () => {
+                setTempElevenLabsKey(settings.elevenLabsApiKey || '');
+                setShowElevenLabsEditor(true);
+              }
+            )}
+
+            {showElevenLabsEditor && (
+              <View style={styles.apiKeyContainer}>
+                <Text style={[styles.apiKeyLabel, { fontFamily: 'Inter_600SemiBold' }]}>ElevenLabs API Key</Text>
+                <View style={{ position: 'relative' }}>
+                  <TextInput
+                    style={styles.apiKeyInput}
+                    placeholder="elevenlabs_..."
+                    placeholderTextColor={colors.textMuted}
+                    secureTextEntry={!showElevenLabsKey}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    value={tempElevenLabsKey}
+                    onChangeText={setTempElevenLabsKey}
+                  />
+                  <TouchableOpacity
+                    style={{ position: 'absolute', right: 12, top: 14 }}
+                    onPress={() => setShowElevenLabsKey(!showElevenLabsKey)}
+                    accessibilityLabel={showElevenLabsKey ? 'Hide key' : 'Show key'}
+                  >
+                    <Ionicons name={showElevenLabsKey ? 'eye-off' : 'eye'} size={22} color={colors.textSecondary} />
+                  </TouchableOpacity>
+                </View>
+                <Text style={[styles.apiKeyHelp, { fontFamily: 'Inter_400Regular' }]}>Used for text-to-speech only. Stored on this device.</Text>
+                <View style={{ flexDirection: 'row', marginTop: 12 }}>
+                  <TouchableOpacity
+                    style={[buttonStyles.primary, { flex: 1 }]}
+                    onPress={handleTestAndSaveElevenLabsKey}
+                    disabled={!tempElevenLabsKey || tempElevenLabsKey.trim().length < 10 || testingElevenLabsKey}
+                  >
+                    <Text style={{ color: colors.text, fontWeight: '600' }}>{testingElevenLabsKey ? 'Testing…' : 'Test & Save'}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[buttonStyles.secondary, { flex: 1, marginLeft: 12 }]}
+                    onPress={() => {
+                      setShowElevenLabsEditor(false);
+                      setTempElevenLabsKey(settings.elevenLabsApiKey || '');
+                    }}
+                  >
+                    <Text style={{ color: colors.text }}>Cancel</Text>
+                  </TouchableOpacity>
+                </View>
+                {settings.elevenLabsApiKey ? (
+                  <TouchableOpacity
+                    style={[buttonStyles.ghost, { marginTop: 8 }]}
+                    onPress={() => {
+                      Alert.alert('Remove Key?', 'This will clear your ElevenLabs API key.', [
+                        { text: 'Cancel', style: 'cancel' },
+                        { text: 'Remove', style: 'destructive', onPress: () => updateSettings({ elevenLabsApiKey: '' }) },
+                      ]);
+                    }}
+                  >
+                    <Text style={{ color: colors.error }}>Remove Key</Text>
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+            )}
+
+            {renderSettingItem(
+              'stats-chart',
+              'ElevenLabs Quota Threshold',
+              `${settings.elevenLabsQuotaThreshold} chars`,
+              <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />,
+              () => {
+                Alert.alert(
+                  'Quota Threshold',
+                  'Warn me when remaining characters fall below…',
+                  ELEVEN_QUOTA_OPTIONS.map(
+                    (n) => (
                       {
-                        text: 'Cancel',
-                        style: 'cancel',
-                      },
-                      {
-                        text: 'Save',
-                        onPress: (text) => updateSettings({ elevenLabsApiKey: text || '' }),
-                      },
-                    ],
-                    'plain-text',
-                    settings.elevenLabsApiKey
-                  );
-                }}
-              >
-                <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
-              </TouchableOpacity>
+                        text: `${n} chars`,
+                        onPress: () => updateSettings({ elevenLabsQuotaThreshold: n }),
+                      } as AlertButton
+                    )
+                  ).concat([{ text: 'Cancel', style: 'cancel', onPress: () => {} }])
+                );
+              }
             )}
           </View>
         )}

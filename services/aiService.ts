@@ -52,11 +52,18 @@ export const generateAffirmation = async (params: GenerateAffirmationParams): Pr
 const getVoiceId = (voiceName: string): string => {
   // Map voice names to ElevenLabs voice IDs
   const voiceMap: Record<string, string> = {
+    // Human-readable labels
     'Female - Soft': '21m00Tcm4TlvDq8ikWAM', // Rachel
     'Female - Warm': 'AZnzlk1XvdvUeBnXmlld', // Domini
     'Male - Deep': 'CYw3kZ02Hs0563khs1Fj', // Clyde
     'Male - Calm': 'EXAVITRWM4VaoBX5IkoI', // Alex
     'Neutral - Gentle': 'TxGEqnHWrfWFTfGW9XjX', // Josh
+    // Settings IDs
+    soft_female: '21m00Tcm4TlvDq8ikWAM',
+    warm_female: 'AZnzlk1XvdvUeBnXmlld',
+    deep_male: 'CYw3kZ02Hs0563khs1Fj',
+    calm_male: 'EXAVITRWM4VaoBX5IkoI',
+    neutral: 'TxGEqnHWrfWFTfGW9XjX',
   };
   
   return voiceMap[voiceName] || '21m00Tcm4TlvDq8ikWAM'; // Default to Rachel
