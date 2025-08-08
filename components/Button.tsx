@@ -8,7 +8,6 @@ interface ButtonProps {
   textStyle?: TextStyle;
   variant?: 'primary' | 'secondary' | 'ghost';
   disabled?: boolean;
-  accessibilityLabel?: string; // <-- Added here
 }
 
 const styles = StyleSheet.create({
@@ -69,8 +68,7 @@ export default function Button({
   style, 
   textStyle, 
   variant = 'primary',
-  disabled = false,
-  accessibilityLabel,   // <-- Added here
+  disabled = false 
 }: ButtonProps) {
   const buttonStyle = [
     styles[variant],
@@ -88,7 +86,6 @@ export default function Button({
       onPress={onPress}
       disabled={disabled}
       activeOpacity={0.8}
-      accessibilityLabel={accessibilityLabel} // <-- Pass it here
     >
       <Text style={[defaultTextStyle, textStyle]}>
         {text}

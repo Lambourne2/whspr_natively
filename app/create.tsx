@@ -1,522 +1,238 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  TextInput,
-  KeyboardAvoidingView, 
-  Platform,
-} from 'react-native';
-import Slider from '@react-native-community/slider';
-import { Audio } from 'expo-av';
-import { useRouter } from 'expo-router';
-import { Feather } from '@expo/vector-icons'; // For back arrow
-import Header from '../components/Header';
+import { Text, View, ScrollView, TextInput, TouchableOpacity, Alert } from 'react-native';
+import { router } from 'expo-router';
+import { useState } from 'react';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
+import { useFonts, Inter_400Regular, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
+import { commonStyles, colors, buttonStyles } from '../styles/commonStyles';
 import Button from '../components/Button';
-import { commonStyles, colors } from '../styles/commonStyles';
 
-const INTERRUPTION_MODE_IOS_MIX_WITH_OTHERS = 1;
-const INTERRUPTION_MODE_ANDROID_DUCK_OTHERS = 1;
-
-const AUDIO_TRACKS = [
-  { name: '48hz Theta Waves', file: require('../assets/audio/48hzThetaWaves.mp3') },
-  { name: '54hz Delta Waves', file: require('../assets/audio/054hzDeltaWaves.mp3') },
-  { name: "423hz Earth's Frequency", file: require('../assets/audio/423hzEarthsNaturalFrequency.mp3') },
-  { name: '528hz Love Frequency', file: require('../assets/audio/528hzLoveFrequency.mp3') },
-  { name: '813hz Alpha Waves', file: require('../assets/audio/813hzAlphaWaves.mp3') },
-  { name: '852hz Third Eye Chakra', file: require('../assets/audio/852hzThirdEyeChakra.mp3') },
-];
-
-type AudioTrack = typeof AUDIO_TRACKS[number];
-
-export default function CreateTrackScreen() {
-  const router = useRouter();
+export default function CreateAffirmationScreen() {
+  const [fontsLoaded] = useFonts({
+    Inter_400Regular,
+    Inter_600SemiBold,
+    Inter_700Bold,
+  });
 
   const [title, setTitle] = useState('');
-  const [selectedTrack, setSelectedTrack] = useState<string | null>(null);
   const [affirmationText, setAffirmationText] = useState('');
-  const [aiVoiceEnabled, setAiVoiceEnabled] = useState(false);
-  const [voiceRecordEnabled, setVoiceRecordEnabled] = useState(false);
-  const [affirmationVolume, setAffirmationVolume] = useState(0.8);
-  const [backingTrackVolume, setBackingTrackVolume] = useState(1);
-  const [duration, setDuration] = useState(10);
+  const [selectedMusic, setSelectedMusic] = useState('rain');
+  const [selectedVoice, setSelectedVoice] = useState('calm');
 
-  const [recording, setRecording] = useState<Audio.Recording | null>(null);
-  const [recordedURI, setRecordedURI] = useState<string | null>(null);
-  const [recordedSound, setRecordedSound] = useState<Audio.Sound | null>(null);
+  const musicOptions = [
+    { id: 'rain', name: 'Gentle Rain', icon: 'rainy' },
+    { id: 'ocean', name: 'Ocean Waves', icon: 'water' },
+    { id: 'forest', name: 'Forest Sounds', icon: 'leaf' },
+    { id: 'piano', name: 'Soft Piano', icon: 'musical-notes' },
+  ];
 
-  const audioPlaybackRef = useRef<Audio.Sound | null>(null);
-  const recordedPlaybackRef = useRef<Audio.Sound | null>(null);
+  const voiceOptions = [
+    { id: 'calm', name: 'Calm & Soothing' },
+    { id: 'warm', name: 'Warm & Gentle' },
+    { id: 'deep', name: 'Deep & Relaxing' },
+    { id: 'soft', name: 'Soft & Whispered' },
+  ];
 
-  const [isBackingPlaying, setIsBackingPlaying] = useState(false);
-  const [isRecordedPlaying, setIsRecordedPlaying] = useState(false);
-  const [recordedDuration, setRecordedDuration] = useState(0);
-  const [recordedPosition, setRecordedPosition] = useState(0);
+  if (!fontsLoaded) {
+    return null;
+  }
 
-  useEffect(() => {
-    return () => {
-      // Cleanup all sounds on unmount
-      if (audioPlaybackRef.current) {
-        audioPlaybackRef.current.stopAsync().catch(() => {});
-        audioPlaybackRef.current.unloadAsync().catch(() => {});
-        audioPlaybackRef.current = null;
-      }
-      if (recordedPlaybackRef.current) {
-        recordedPlaybackRef.current.stopAsync().catch(() => {});
-        recordedPlaybackRef.current.unloadAsync().catch(() => {});
-        recordedPlaybackRef.current = null;
-      }
-      if (recordedSound) {
-        recordedSound.unloadAsync().catch(() => {});
-      }
-    };
-  }, [recordedSound]);
-
-  useEffect(() => {
-    if (audioPlaybackRef.current) {
-      audioPlaybackRef.current.setVolumeAsync(backingTrackVolume).catch(() => {});
+  const handleSave = () => {
+    if (!title.trim() || !affirmationText.trim()) {
+      Alert.alert('Missing Information', 'Please fill in both title and affirmation text.');
+      return;
     }
-  }, [backingTrackVolume]);
 
-  // --- Play/Pause Backing Track ---
-  const toggleAudio = useCallback(
-    async (track: AudioTrack) => {
-      try {
-        // If same track selected again, pause it
-        if (selectedTrack === track.name && audioPlaybackRef.current) {
-          const status = await audioPlaybackRef.current.getStatusAsync();
-          if (status.isPlaying) {
-            await audioPlaybackRef.current.pauseAsync();
-            setIsBackingPlaying(false);
-            return;
-          } else {
-            await audioPlaybackRef.current.playAsync();
-            setIsBackingPlaying(true);
-            return;
+    console.log('Saving affirmation:', { title, affirmationText, selectedMusic, selectedVoice });
+    Alert.alert(
+      'Affirmation Created!',
+      'Your custom affirmation has been saved successfully.',
+      [
+        {
+          text: 'Create Another',
+          onPress: () => {
+            setTitle('');
+            setAffirmationText('');
           }
+        },
+        {
+          text: 'Go to Library',
+          onPress: () => router.push('/library')
         }
-
-        // New track selected - unload existing backing audio if any
-        if (audioPlaybackRef.current) {
-          await audioPlaybackRef.current.stopAsync();
-          await audioPlaybackRef.current.unloadAsync();
-          audioPlaybackRef.current = null;
-        }
-        const { sound } = await Audio.Sound.createAsync(track.file, {
-          shouldPlay: true,
-          isLooping: true,
-          volume: backingTrackVolume,
-        });
-        audioPlaybackRef.current = sound;
-
-        // Listen for playback status to update play/pause button UI
-        sound.setOnPlaybackStatusUpdate((status) => {
-          setIsBackingPlaying(status.isPlaying ?? false);
-        });
-
-        await sound.playAsync();
-        setSelectedTrack(track.name);
-      } catch (error) {
-        console.error('Error toggling audio:', error);
-      }
-    },
-    [backingTrackVolume, selectedTrack]
-  );
-
-  const pauseBacking = async () => {
-    if (audioPlaybackRef.current) {
-      const status = await audioPlaybackRef.current.getStatusAsync();
-      if (status.isPlaying) {
-        await audioPlaybackRef.current.pauseAsync();
-        setIsBackingPlaying(false);
-      }
-    }
+      ]
+    );
   };
 
-  // --- Recording functions ---
-  const startRecording = async () => {
-    try {
-      const permission = await Audio.requestPermissionsAsync();
-      if (permission.status !== 'granted') {
-        alert('Permission to access microphone is required!');
-        return;
-      }
-
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        interruptionModeIOS: INTERRUPTION_MODE_IOS_MIX_WITH_OTHERS,
-        playsInSilentModeIOS: true,
-        shouldDuckAndroid: true,
-        interruptionModeAndroid: INTERRUPTION_MODE_ANDROID_DUCK_OTHERS,
-        playThroughEarpieceAndroid: false,
-        staysActiveInBackground: true,
-      });
-
-      // Pause backing audio if playing
-      if (audioPlaybackRef.current) {
-        await audioPlaybackRef.current.pauseAsync();
-        setIsBackingPlaying(false);
-      }
-
-      const { recording } = await Audio.Recording.createAsync(
-        Audio.RECORDING_OPTIONS_PRESET_HIGH_QUALITY
-      );
-      setRecording(recording);
-    } catch (err) {
-      console.error('Failed to start recording', err);
-    }
-  };
-
-  const stopRecording = async () => {
-    try {
-      if (!recording) return;
-      await recording.stopAndUnloadAsync();
-      const uri = recording.getURI();
-      setRecordedURI(uri || null);
-      setRecording(null);
-
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: false,
-        interruptionModeIOS: INTERRUPTION_MODE_IOS_MIX_WITH_OTHERS,
-        playsInSilentModeIOS: true,
-        shouldDuckAndroid: true,
-        interruptionModeAndroid: INTERRUPTION_MODE_ANDROID_DUCK_OTHERS,
-        playThroughEarpieceAndroid: false,
-        staysActiveInBackground: true,
-      });
-
-      // Prepare recorded playback instance
-      if (recordedPlaybackRef.current) {
-        await recordedPlaybackRef.current.unloadAsync();
-        recordedPlaybackRef.current = null;
-      }
-      if (uri) {
-        const { sound } = await Audio.Sound.createAsync({ uri });
-        recordedPlaybackRef.current = sound;
-
-        // Update recorded audio duration
-        const status = await sound.getStatusAsync();
-        setRecordedDuration(status.durationMillis ?? 0);
-        setRecordedPosition(0);
-
-        // Listen for playback position update to sync slider
-        sound.setOnPlaybackStatusUpdate((status) => {
-          if (!status.isLoaded) return;
-          setRecordedPosition(status.positionMillis);
-          setIsRecordedPlaying(status.isPlaying ?? false);
-
-          // Stop updating position after finished
-          if (status.didJustFinish) {
-            setIsRecordedPlaying(false);
-            setRecordedPosition(status.durationMillis ?? 0);
-          }
-        });
-      }
-
-      // Resume backing audio if selected
-      if (audioPlaybackRef.current && selectedTrack) {
-        await audioPlaybackRef.current.playAsync();
-        setIsBackingPlaying(true);
-      }
-    } catch (err) {
-      console.error('Failed to stop recording', err);
-    }
-  };
-
-  // Play both backing and recorded audio from start together, synced
-  const playRecording = async () => {
-    if (!recordedURI) return;
-
-    try {
-      // Restart backing track from start
-      if (audioPlaybackRef.current) {
-        await audioPlaybackRef.current.setPositionAsync(0);
-        await audioPlaybackRef.current.playAsync();
-        setIsBackingPlaying(true);
-      }
-
-      // Restart recorded voice from start
-      if (recordedPlaybackRef.current) {
-        await recordedPlaybackRef.current.setPositionAsync(0);
-        await recordedPlaybackRef.current.playAsync();
-        setIsRecordedPlaying(true);
-      }
-    } catch (err) {
-      console.error('Failed to play recording', err);
-    }
-  };
-
-  // Pause recorded voice and backing together
-  const pauseAllAudio = async () => {
-    if (audioPlaybackRef.current) {
-      await audioPlaybackRef.current.pauseAsync();
-      setIsBackingPlaying(false);
-    }
-    if (recordedPlaybackRef.current) {
-      await recordedPlaybackRef.current.pauseAsync();
-      setIsRecordedPlaying(false);
-    }
-  };
-
-  // Seek recorded voice audio via slider
-  const seekRecorded = async (value: number) => {
-    if (recordedPlaybackRef.current) {
-      await recordedPlaybackRef.current.setPositionAsync(value);
-      setRecordedPosition(value);
-    }
-  };
-
-  // Reset recording (delete current recorded URI & unload playback)
-  const resetRecording = async () => {
-    if (recordedPlaybackRef.current) {
-      await recordedPlaybackRef.current.stopAsync();
-      await recordedPlaybackRef.current.unloadAsync();
-      recordedPlaybackRef.current = null;
-    }
-    setRecordedURI(null);
-    setRecordedSound(null);
-    setRecordedDuration(0);
-    setRecordedPosition(0);
-    setIsRecordedPlaying(false);
-  };
-
-  const toggleSwitch = useCallback((type: 'ai' | 'record') => {
-    if (type === 'ai') {
-      setAiVoiceEnabled(true);
-      setVoiceRecordEnabled(false);
-    } else {
-      setAiVoiceEnabled(false);
-      setVoiceRecordEnabled(true);
-    }
-  }, []);
+  console.log('CreateAffirmationScreen rendered');
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={[commonStyles.container, { paddingHorizontal: 16 }]}
-    >
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Header with Back Button and Centered Title + Subtitle */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 16 }}>
-          <TouchableOpacity onPress={() => router.back()} style={{ padding: 8 }}>
-            <Feather name="arrow-left" size={28} color={colors.text} />
+    <View style={commonStyles.container}>
+      <ScrollView style={commonStyles.content} showsVerticalScrollIndicator={false}>
+        {/* Header */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 20, marginBottom: 30 }}>
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={{ marginRight: 16 }}
+          >
+            <Ionicons name="arrow-back" size={24} color={colors.text} />
           </TouchableOpacity>
-
-          <View style={{ flex: 1, alignItems: 'center' }}>
-            <Text
-              style={{
-                fontSize: 28,
-                fontWeight: '700',
-                color: colors.text,
-                textAlign: 'center',
-              }}
-              accessibilityRole="header"
-            >
-              Create Track
-            </Text>
-            <Text
-              style={{
-                fontSize: 16,
-                color: colors.textSecondary,
-                marginTop: 4,
-                textAlign: 'center',
-              }}
-            >
-              Build your personalized meditation journey
-            </Text>
-          </View>
-
-          <View style={{ width: 40 }} />
+          <Text style={[commonStyles.title, { fontFamily: 'Inter_700Bold', flex: 1, textAlign: 'left' }]}>
+            Create Affirmation
+          </Text>
         </View>
 
-        {/* Track Title Input */}
-        <TextInput
-          placeholder="Enter track title"
-          value={title}
-          onChangeText={setTitle}
-          style={commonStyles.input}
-          accessibilityLabel="Track title input"
-        />
+        {/* Title Input */}
+        <View style={{ marginBottom: 24 }}>
+          <Text style={[commonStyles.text, { fontFamily: 'Inter_600SemiBold', marginBottom: 8 }]}>
+            Title
+          </Text>
+          <TextInput
+            style={[commonStyles.input, { fontFamily: 'Inter_400Regular' }]}
+            placeholder="Enter affirmation title..."
+            placeholderTextColor={colors.textMuted}
+            value={title}
+            onChangeText={setTitle}
+          />
+        </View>
 
-        {/* Backing Tracks Grid */}
-        <Text style={[commonStyles.subtitle, { marginTop: 24, marginBottom: 12 }]}>
-          Select Backing Track
-        </Text>
-        <View
-          style={{
-            flexDirection: 'row',
-            flexWrap: 'wrap',
-            justifyContent: 'space-between',
-            marginBottom: 20,
-          }}
-        >
-          {AUDIO_TRACKS.map((track) => (
-            <TouchableOpacity
-              key={track.name}
-              onPress={() => toggleAudio(track)}
-              style={{
-                width: '30%', // 3 per row
-                padding: 12,
-                borderRadius: 12,
-                backgroundColor: selectedTrack === track.name ? colors.primary : colors.surface,
-                marginBottom: 16,
-                alignItems: 'center',
-                justifyContent: 'center',
-                minHeight: 80,
-              }}
-              accessibilityRole="button"
-              accessibilityLabel={`Select backing track ${track.name}`}
-            >
-              <Text
-                style={{
-                  color: selectedTrack === track.name ? '#fff' : colors.textMuted,
-                  fontSize: 14,
-                  textAlign: 'center',
+        {/* Affirmation Text */}
+        <View style={{ marginBottom: 24 }}>
+          <Text style={[commonStyles.text, { fontFamily: 'Inter_600SemiBold', marginBottom: 8 }]}>
+            Affirmation Text
+          </Text>
+          <TextInput
+            style={[commonStyles.input, { fontFamily: 'Inter_400Regular', height: 120, textAlignVertical: 'top' }]}
+            placeholder="Write your affirmation here... e.g., 'I am calm, peaceful, and ready for restful sleep. My mind is quiet and my body is relaxed.'"
+            placeholderTextColor={colors.textMuted}
+            value={affirmationText}
+            onChangeText={setAffirmationText}
+            multiline
+          />
+        </View>
+
+        {/* Background Music Selection */}
+        <View style={{ marginBottom: 24 }}>
+          <Text style={[commonStyles.text, { fontFamily: 'Inter_600SemiBold', marginBottom: 12 }]}>
+            Background Music
+          </Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+            {musicOptions.map((music) => (
+              <TouchableOpacity
+                key={music.id}
+                style={[
+                  commonStyles.card,
+                  {
+                    flex: 1,
+                    minWidth: '45%',
+                    alignItems: 'center',
+                    paddingVertical: 16,
+                    borderColor: selectedMusic === music.id ? colors.primary : colors.border,
+                    borderWidth: 2,
+                  }
+                ]}
+                onPress={() => {
+                  console.log(`Selected music: ${music.name}`);
+                  setSelectedMusic(music.id);
                 }}
               >
-                {track.name}
+                <Ionicons 
+                  name={music.icon as any} 
+                  size={24} 
+                  color={selectedMusic === music.id ? colors.primary : colors.textSecondary} 
+                  style={{ marginBottom: 8 }}
+                />
+                <Text style={[
+                  commonStyles.textMuted, 
+                  { 
+                    fontFamily: 'Inter_400Regular',
+                    color: selectedMusic === music.id ? colors.primary : colors.textSecondary,
+                    textAlign: 'center'
+                  }
+                ]}>
+                  {music.name}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        {/* Voice Selection */}
+        <View style={{ marginBottom: 32 }}>
+          <Text style={[commonStyles.text, { fontFamily: 'Inter_600SemiBold', marginBottom: 12 }]}>
+            Voice Style
+          </Text>
+          {voiceOptions.map((voice) => (
+            <TouchableOpacity
+              key={voice.id}
+              style={[
+                commonStyles.card,
+                {
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  borderColor: selectedVoice === voice.id ? colors.primary : colors.border,
+                  borderWidth: 2,
+                  marginBottom: 8,
+                }
+              ]}
+              onPress={() => {
+                console.log(`Selected voice: ${voice.name}`);
+                setSelectedVoice(voice.id);
+              }}
+            >
+              <Text style={[
+                commonStyles.text, 
+                { 
+                  fontFamily: 'Inter_400Regular',
+                  color: selectedVoice === voice.id ? colors.primary : colors.text
+                }
+              ]}>
+                {voice.name}
               </Text>
+              {selectedVoice === voice.id && (
+                <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
+              )}
             </TouchableOpacity>
           ))}
         </View>
 
-        {/* Backing track play/pause button */}
-        {selectedTrack && (
-          <View style={{ flexDirection: 'row', justifyContent: 'center', marginBottom: 20 }}>
-            <Button
-              text={isBackingPlaying ? 'Pause Backing Track' : 'Play Backing Track'}
-              onPress={async () => {
-                if (isBackingPlaying) {
-                  await pauseBacking();
-                } else if (audioPlaybackRef.current) {
-                  await audioPlaybackRef.current.playAsync();
-                  setIsBackingPlaying(true);
-                }
-              }}
-              variant="secondary"
-              style={{ paddingVertical: 6, paddingHorizontal: 12 }}
-            />
-          </View>
-        )}
+        {/* Action Buttons */}
+        <View style={{ marginBottom: 40 }}>
+          <TouchableOpacity
+            style={[buttonStyles.primary, { marginBottom: 16 }]}
+            onPress={() => {
+              console.log('Generate AI affirmation');
+              router.push('/ai-generate');
+            }}
+          >
+            <LinearGradient
+              colors={[colors.primary, colors.secondary]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={[buttonStyles.primary, { margin: 0 }]}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Ionicons name="sparkles" size={20} color={colors.text} style={{ marginRight: 8 }} />
+                <Text style={[commonStyles.text, { fontFamily: 'Inter_600SemiBold', color: colors.text }]}>
+                  Generate with AI
+                </Text>
+              </View>
+            </LinearGradient>
+          </TouchableOpacity>
 
-        {/* Affirmations Input */}
-        <Text style={[commonStyles.subtitle, { marginTop: 24 }]}>Affirmations</Text>
-        <TextInput
-          placeholder="Write your own affirmations..."
-          value={affirmationText}
-          onChangeText={setAffirmationText}
-          multiline
-          style={[commonStyles.input, { minHeight: 80 }]}
-          accessibilityLabel="Affirmations input"
-        />
-        <Text style={commonStyles.textMuted}>
-          Write your own affirmations above. You can use AI Voice to speak it or record your own voice.
-        </Text>
-
-        {/* AI Voice / Record Switch Buttons */}
-        <View style={{ flexDirection: 'row', justifyContent: 'space-around', marginVertical: 16 }}>
-          <Button
-            text="AI Voice"
-            onPress={() => toggleSwitch('ai')}
-            variant={aiVoiceEnabled ? 'primary' : 'secondary'}
-            style={{ paddingVertical: 6, paddingHorizontal: 12 }}
-          />
-          <Button
-            text="AI Generate"
-            onPress={() => router.push('/ai-generate')}
-            variant="secondary"
-            style={{ paddingVertical: 6, paddingHorizontal: 12 }}
-          />
-          <Button
-            text="Record"
-            onPress={() => toggleSwitch('record')}
-            variant={voiceRecordEnabled ? 'primary' : 'secondary'}
-            style={{ paddingVertical: 6, paddingHorizontal: 12 }}
-          />
+          <TouchableOpacity
+            style={buttonStyles.secondary}
+            onPress={handleSave}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Ionicons name="save" size={20} color={colors.textSecondary} style={{ marginRight: 8 }} />
+              <Text style={[commonStyles.text, { fontFamily: 'Inter_600SemiBold', color: colors.textSecondary }]}>
+                Save Affirmation
+              </Text>
+            </View>
+          </TouchableOpacity>
         </View>
-
-        {/* Voice Recording Controls */}
-        {voiceRecordEnabled && (
-          <View style={{ alignItems: 'center', gap: 10, marginBottom: 20 }}>
-            {!recording ? (
-              <Button text="Start Recording" onPress={startRecording} variant="primary" />
-            ) : (
-              <Button text="Stop Recording" onPress={stopRecording} variant="secondary" />
-            )}
-            {recordedURI && (
-              <>
-                <Button text={isRecordedPlaying ? "Pause Recording Playback" : "Play Recording"} onPress={() => {
-                  if (isRecordedPlaying) {
-                    pauseAllAudio();
-                  } else {
-                    playRecording();
-                  }
-                }} variant="secondary" />
-                {/* Seek bar for recorded voice */}
-                <Slider
-                  minimumValue={0}
-                  maximumValue={recordedDuration}
-                  step={1000}
-                  value={recordedPosition}
-                  onValueChange={seekRecorded}
-                  style={{ width: '90%', marginTop: 10 }}
-                  accessibilityLabel="Seek recorded voice"
-                />
-                <View style={{ flexDirection: 'row', justifyContent: 'space-around', width: '90%', marginTop: 10 }}>
-                  <Button text="Restart Recording" onPress={resetRecording} variant="secondary" />
-                  {/* Placeholder for Trim functionality - can implement later */}
-                  {/* <Button text="Trim" onPress={() => {}} variant="secondary" /> */}
-                </View>
-              </>
-            )}
-          </View>
-        )}
-
-        {/* Volume Sliders */}
-        <Text style={commonStyles.subtitle}>Affirmation Volume</Text>
-        <Slider
-          minimumValue={0}
-          maximumValue={1}
-          step={0.05}
-          value={affirmationVolume}
-          onValueChange={setAffirmationVolume}
-          accessibilityLabel="Adjust affirmation volume"
-        />
-
-        <Text style={commonStyles.subtitle}>Backing Track Volume</Text>
-        <Slider
-          minimumValue={0}
-          maximumValue={1}
-          step={0.05}
-          value={backingTrackVolume}
-          onValueChange={async (value) => {
-            setBackingTrackVolume(value);
-            if (audioPlaybackRef.current) {
-              await audioPlaybackRef.current.setVolumeAsync(value);
-            }
-          }}
-          accessibilityLabel="Adjust backing track volume"
-        />
-
-        <Text style={commonStyles.subtitle}>Duration: {duration} min</Text>
-        <Slider
-          minimumValue={1}
-          maximumValue={30}
-          step={1}
-          value={duration}
-          onValueChange={setDuration}
-          accessibilityLabel="Set track duration in minutes"
-        />
-
-        {/* Create Track Button */}
-        <Button
-          text="Create Track"
-          onPress={() => console.log('Saving...')}
-          style={{ marginVertical: 24 }}
-          accessibilityLabel="Create track button"
-        />
       </ScrollView>
-    </KeyboardAvoidingView>
+    </View>
   );
 }

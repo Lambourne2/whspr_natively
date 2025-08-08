@@ -50,33 +50,11 @@ export const buttonStyles = StyleSheet.create({
   },
 });
 
-interface CommonStyles {
-  wrapper: ViewStyle;
-  wrapperCentered: ViewStyle;
-  container: ViewStyle;
-  content: ViewStyle;
-  centerContent: ViewStyle;
-  title: TextStyle;
-  subtitle: TextStyle;
-  text: TextStyle;
-  textMuted: TextStyle;
-  card: ViewStyle;
-  input: TextStyle;
-}
-
-export const commonStyles = StyleSheet.create<CommonStyles>({
+export const commonStyles = StyleSheet.create({
   wrapper: {
     backgroundColor: colors.background,
     width: '100%',
     height: '100%',
-  },
-  wrapperCentered: {
-    flex: 1,
-    backgroundColor: colors.background,
-    width: '100%',
-    height: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   container: {
     flex: 1,
@@ -144,8 +122,7 @@ export const commonStyles = StyleSheet.create<CommonStyles>({
     borderColor: colors.border,
     marginVertical: 8,
   },
+  gradient: {
+    background: `linear-gradient(135deg, ${colors.primary} 0%, ${colors.secondary} 100%)`,
+  },
 });
-
-export const gradientStyle = {
-  background: `linear-gradient(135deg, ${colors.primary} 0%, ${colors.secondary} 100%)`,
-};

@@ -1,3 +1,0 @@
-log changes
-Added ai-voice-select.tsx to allow the user to choose a voice style.
-Added voiceStore.ts file to retrieve the selected AI voice anywhere in your app.

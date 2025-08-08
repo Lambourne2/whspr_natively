@@ -37,5 +37,3 @@ netlify.toml
 
 pnpm-lock.yaml
 package-lock.json
-
-.env
