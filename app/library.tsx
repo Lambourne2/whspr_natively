@@ -154,6 +154,16 @@ const LibraryScreen: React.FC<LibraryScreenProps> = () => {
       >
         {/* Header */}
         <View style={styles.header}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => router.back()}
+          >
+            <Ionicons
+              name="arrow-back"
+              size={24}
+              color={colors.text}
+            />
+          </TouchableOpacity>
           <Text style={styles.title}>My Library</Text>
           <TouchableOpacity
             style={styles.filterButton}
@@ -401,6 +411,9 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontFamily: 'Inter_700Bold',
     color: colors.text,
+  },
+  backButton: {
+    padding: 8,
   },
   filterButton: {
     padding: 8,
