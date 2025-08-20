@@ -1,17 +1,11 @@
 import React from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  StyleSheet,
-} from 'react-native';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useFonts, Inter_400Regular, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
 import { commonStyles, colors } from '../styles/commonStyles';
 import Card from '../components/Card';
-import Button from '../components/Button';
 
 export default function HomeScreen() {
   const [fontsLoaded] = useFonts({
@@ -20,9 +14,7 @@ export default function HomeScreen() {
     Inter_700Bold,
   });
 
-  if (!fontsLoaded) {
-    return null;
-  }
+  if (!fontsLoaded) return null;
 
   return (
     <View style={commonStyles.container}>
@@ -50,6 +42,7 @@ export default function HomeScreen() {
         </View>
 
         <View style={styles.featureCards}>
+          {/* Create Card */}
           <Card onPress={() => router.push('/create')}>
             <View style={styles.cardContentContainer}>
               <LinearGradient
@@ -66,22 +59,7 @@ export default function HomeScreen() {
             </View>
           </Card>
 
-          <Card onPress={() => router.push('/ai-generate')}>
-            <View style={styles.cardContentContainer}>
-              <LinearGradient
-                colors={[colors.primary + '20', colors.secondary + '20']}
-                style={styles.cardIcon}
-              >
-                <Ionicons name="sparkles" size={32} color={colors.primary} />
-              </LinearGradient>
-              <View style={styles.cardContent}>
-                <Text style={[styles.cardTitle, { fontFamily: 'Inter_600SemiBold' }]}>AI Generate</Text>
-                <Text style={[styles.cardSubtitle, { fontFamily: 'Inter_400Regular' }]}>Let AI create for you</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
-            </View>
-          </Card>
-
+          {/* Library Card */}
           <Card onPress={() => router.push('/library')}>
             <View style={styles.cardContentContainer}>
               <LinearGradient
@@ -97,14 +75,24 @@ export default function HomeScreen() {
               <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
             </View>
           </Card>
-        </View>
 
-        <Button 
-          text="Settings"
-          onPress={() => router.push('/settings')}
-          variant="secondary"
-          style={styles.settingsButton}
-        />
+          {/* Settings Card */}
+          <Card onPress={() => router.push('/settings')}>
+            <View style={styles.cardContentContainer}>
+              <LinearGradient
+                colors={[colors.primary + '20', colors.secondary + '20']}
+                style={styles.cardIcon}
+              >
+                <Ionicons name="settings" size={32} color={colors.primary} />
+              </LinearGradient>
+              <View style={styles.cardContent}>
+                <Text style={[styles.cardTitle, { fontFamily: 'Inter_600SemiBold' }]}>Settings</Text>
+                <Text style={[styles.cardSubtitle, { fontFamily: 'Inter_400Regular' }]}>Adjust your preferences</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+            </View>
+          </Card>
+        </View>
       </ScrollView>
     </View>
   );
@@ -172,9 +160,5 @@ const styles = StyleSheet.create({
   cardSubtitle: {
     fontSize: 14,
     color: colors.textSecondary,
-  },
-  settingsButton: {
-    alignSelf: 'center',
-    width: '100%',
   },
 });

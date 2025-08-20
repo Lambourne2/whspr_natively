@@ -10,8 +10,9 @@ import {
 } from 'react-native';
 import Slider from '@react-native-community/slider';
 import { Audio } from 'expo-av';
+import * as Speech from 'expo-speech';
 import { useRouter } from 'expo-router';
-import { Feather } from '@expo/vector-icons'; // For back arrow
+import { Feather } from '@expo/vector-icons';
 import Header from '../components/Header';
 import Button from '../components/Button';
 import { commonStyles, colors } from '../styles/commonStyles';
@@ -54,9 +55,11 @@ export default function CreateTrackScreen() {
   const [recordedDuration, setRecordedDuration] = useState(0);
   const [recordedPosition, setRecordedPosition] = useState(0);
 
+  const [selectedVoice, setSelectedVoice] = useState<string | null>(null);
+
+  /** Cleanup on unmount */
   useEffect(() => {
     return () => {
-      // Cleanup all sounds on unmount
       if (audioPlaybackRef.current) {
         audioPlaybackRef.current.stopAsync().catch(() => {});
         audioPlaybackRef.current.unloadAsync().catch(() => {});
@@ -73,17 +76,17 @@ export default function CreateTrackScreen() {
     };
   }, [recordedSound]);
 
+  /** Update backing track volume */
   useEffect(() => {
     if (audioPlaybackRef.current) {
       audioPlaybackRef.current.setVolumeAsync(backingTrackVolume).catch(() => {});
     }
   }, [backingTrackVolume]);
 
-  // --- Play/Pause Backing Track ---
+  /** Toggle backing track */
   const toggleAudio = useCallback(
     async (track: AudioTrack) => {
       try {
-        // If same track selected again, pause it
         if (selectedTrack === track.name && audioPlaybackRef.current) {
           const status = await audioPlaybackRef.current.getStatusAsync();
           if (status.isPlaying) {
@@ -97,7 +100,6 @@ export default function CreateTrackScreen() {
           }
         }
 
-        // New track selected - unload existing backing audio if any
         if (audioPlaybackRef.current) {
           await audioPlaybackRef.current.stopAsync();
           await audioPlaybackRef.current.unloadAsync();
@@ -110,7 +112,6 @@ export default function CreateTrackScreen() {
         });
         audioPlaybackRef.current = sound;
 
-        // Listen for playback status to update play/pause button UI
         sound.setOnPlaybackStatusUpdate((status) => {
           setIsBackingPlaying(status.isPlaying ?? false);
         });
@@ -134,7 +135,7 @@ export default function CreateTrackScreen() {
     }
   };
 
-  // --- Recording functions ---
+  /** Recording Functions */
   const startRecording = async () => {
     try {
       const permission = await Audio.requestPermissionsAsync();
@@ -153,8 +154,7 @@ export default function CreateTrackScreen() {
         staysActiveInBackground: true,
       });
 
-      // Pause backing audio if playing
-      if (audioPlaybackRef.current) {
+      if (audioPlaybackRef.current && isBackingPlaying) {
         await audioPlaybackRef.current.pauseAsync();
         setIsBackingPlaying(false);
       }
@@ -186,7 +186,6 @@ export default function CreateTrackScreen() {
         staysActiveInBackground: true,
       });
 
-      // Prepare recorded playback instance
       if (recordedPlaybackRef.current) {
         await recordedPlaybackRef.current.unloadAsync();
         recordedPlaybackRef.current = null;
@@ -195,18 +194,14 @@ export default function CreateTrackScreen() {
         const { sound } = await Audio.Sound.createAsync({ uri });
         recordedPlaybackRef.current = sound;
 
-        // Update recorded audio duration
         const status = await sound.getStatusAsync();
         setRecordedDuration(status.durationMillis ?? 0);
         setRecordedPosition(0);
 
-        // Listen for playback position update to sync slider
         sound.setOnPlaybackStatusUpdate((status) => {
           if (!status.isLoaded) return;
           setRecordedPosition(status.positionMillis);
           setIsRecordedPlaying(status.isPlaying ?? false);
-
-          // Stop updating position after finished
           if (status.didJustFinish) {
             setIsRecordedPlaying(false);
             setRecordedPosition(status.durationMillis ?? 0);
@@ -214,7 +209,6 @@ export default function CreateTrackScreen() {
         });
       }
 
-      // Resume backing audio if selected
       if (audioPlaybackRef.current && selectedTrack) {
         await audioPlaybackRef.current.playAsync();
         setIsBackingPlaying(true);
@@ -224,19 +218,14 @@ export default function CreateTrackScreen() {
     }
   };
 
-  // Play both backing and recorded audio from start together, synced
   const playRecording = async () => {
     if (!recordedURI) return;
-
     try {
-      // Restart backing track from start
       if (audioPlaybackRef.current) {
         await audioPlaybackRef.current.setPositionAsync(0);
         await audioPlaybackRef.current.playAsync();
         setIsBackingPlaying(true);
       }
-
-      // Restart recorded voice from start
       if (recordedPlaybackRef.current) {
         await recordedPlaybackRef.current.setPositionAsync(0);
         await recordedPlaybackRef.current.playAsync();
@@ -247,7 +236,6 @@ export default function CreateTrackScreen() {
     }
   };
 
-  // Pause recorded voice and backing together
   const pauseAllAudio = async () => {
     if (audioPlaybackRef.current) {
       await audioPlaybackRef.current.pauseAsync();
@@ -259,7 +247,6 @@ export default function CreateTrackScreen() {
     }
   };
 
-  // Seek recorded voice audio via slider
   const seekRecorded = async (value: number) => {
     if (recordedPlaybackRef.current) {
       await recordedPlaybackRef.current.setPositionAsync(value);
@@ -267,7 +254,6 @@ export default function CreateTrackScreen() {
     }
   };
 
-  // Reset recording (delete current recorded URI & unload playback)
   const resetRecording = async () => {
     if (recordedPlaybackRef.current) {
       await recordedPlaybackRef.current.stopAsync();
@@ -281,6 +267,7 @@ export default function CreateTrackScreen() {
     setIsRecordedPlaying(false);
   };
 
+  /** AI / Record toggle */
   const toggleSwitch = useCallback((type: 'ai' | 'record') => {
     if (type === 'ai') {
       setAiVoiceEnabled(true);
@@ -291,72 +278,53 @@ export default function CreateTrackScreen() {
     }
   }, []);
 
+  /** Speak affirmations using selected TTS voice */
+  const speakAffirmations = (text: string) => {
+    if (!text) return;
+    Speech.stop();
+    Speech.speak(text, {
+      voice: selectedVoice || undefined,
+      pitch: 1,
+      rate: 1,
+    });
+  };
+
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={[commonStyles.container, { paddingHorizontal: 16 }]}
     >
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Header with Back Button and Centered Title + Subtitle */}
+        {/* Header */}
         <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 16 }}>
           <TouchableOpacity onPress={() => router.back()} style={{ padding: 8 }}>
             <Feather name="arrow-left" size={28} color={colors.text} />
           </TouchableOpacity>
-
           <View style={{ flex: 1, alignItems: 'center' }}>
-            <Text
-              style={{
-                fontSize: 28,
-                fontWeight: '700',
-                color: colors.text,
-                textAlign: 'center',
-              }}
-              accessibilityRole="header"
-            >
+            <Text style={{ fontSize: 28, fontWeight: '700', color: colors.text, textAlign: 'center' }} accessibilityRole="header">
               Create Track
             </Text>
-            <Text
-              style={{
-                fontSize: 16,
-                color: colors.textSecondary,
-                marginTop: 4,
-                textAlign: 'center',
-              }}
-            >
+            <Text style={{ fontSize: 16, color: colors.textSecondary, marginTop: 4, textAlign: 'center' }}>
               Build your personalized meditation journey
             </Text>
           </View>
-
-          <View style={{ width: 40 }} />
+          <TouchableOpacity onPress={() => router.push('/settings')} style={{ padding: 8 }}>
+            <Feather name="settings" size={28} color={colors.text} />
+          </TouchableOpacity>
         </View>
 
-        {/* Track Title Input */}
-        <TextInput
-          placeholder="Enter track title"
-          value={title}
-          onChangeText={setTitle}
-          style={commonStyles.input}
-          accessibilityLabel="Track title input"
-        />
+        {/* Track title */}
+        <TextInput placeholder="Enter track title" value={title} onChangeText={setTitle} style={commonStyles.input} accessibilityLabel="Track title input" />
 
-        {/* Backing Tracks Grid */}
-        <Text style={[commonStyles.subtitle, { marginTop: 24, marginBottom: 12 }]}>
-          Select Backing Track
-        </Text>
-        <View
-          style={{
-            flexDirection: 'row',
-            flexWrap: 'wrap',
-            justifyContent: 'space-between',
-            marginBottom: 20,
-          }}
-        >
+        {/* Backing tracks */}
+        <Text style={[commonStyles.subtitle, { marginTop: 24, marginBottom: 12 }]}>Select Backing Track</Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: 20 }}>
           {AUDIO_TRACKS.map((track) => (
             <TouchableOpacity
               key={track.name}
               onPress={() => toggleAudio(track)}
               style={{
-                width: '30%', // 3 per row
+                width: '30%',
                 padding: 12,
                 borderRadius: 12,
                 backgroundColor: selectedTrack === track.name ? colors.primary : colors.surface,
@@ -365,42 +333,21 @@ export default function CreateTrackScreen() {
                 justifyContent: 'center',
                 minHeight: 80,
               }}
-              accessibilityRole="button"
-              accessibilityLabel={`Select backing track ${track.name}`}
             >
-              <Text
-                style={{
-                  color: selectedTrack === track.name ? '#fff' : colors.textMuted,
-                  fontSize: 14,
-                  textAlign: 'center',
-                }}
-              >
+              <Text style={{ color: selectedTrack === track.name ? '#fff' : colors.textMuted, fontSize: 14, textAlign: 'center' }}>
                 {track.name}
               </Text>
             </TouchableOpacity>
           ))}
         </View>
 
-        {/* Backing track play/pause button */}
         {selectedTrack && (
           <View style={{ flexDirection: 'row', justifyContent: 'center', marginBottom: 20 }}>
-            <Button
-              text={isBackingPlaying ? 'Pause Backing Track' : 'Play Backing Track'}
-              onPress={async () => {
-                if (isBackingPlaying) {
-                  await pauseBacking();
-                } else if (audioPlaybackRef.current) {
-                  await audioPlaybackRef.current.playAsync();
-                  setIsBackingPlaying(true);
-                }
-              }}
-              variant="secondary"
-              style={{ paddingVertical: 6, paddingHorizontal: 12 }}
-            />
+            <Button text={isBackingPlaying ? 'Pause Backing Track' : 'Play Backing Track'} onPress={async () => { if (isBackingPlaying) { await pauseBacking(); } else if (audioPlaybackRef.current) { await audioPlaybackRef.current.playAsync(); setIsBackingPlaying(true); } }} variant="secondary" style={{ paddingVertical: 6, paddingHorizontal: 12 }} />
           </View>
         )}
 
-        {/* Affirmations Input */}
+        {/* Affirmations */}
         <Text style={[commonStyles.subtitle, { marginTop: 24 }]}>Affirmations</Text>
         <TextInput
           placeholder="Write your own affirmations..."
@@ -414,29 +361,21 @@ export default function CreateTrackScreen() {
           Write your own affirmations above. You can use AI Voice to speak it or record your own voice.
         </Text>
 
-        {/* AI Voice / Record Switch Buttons */}
+        {/* AI / Record / Generate buttons */}
         <View style={{ flexDirection: 'row', justifyContent: 'space-around', marginVertical: 16 }}>
-          <Button
-            text="AI Voice"
-            onPress={() => toggleSwitch('ai')}
-            variant={aiVoiceEnabled ? 'primary' : 'secondary'}
-            style={{ paddingVertical: 6, paddingHorizontal: 12 }}
-          />
-          <Button
-            text="AI Generate"
-            onPress={() => router.push('/ai-generate')}
-            variant="secondary"
-            style={{ paddingVertical: 6, paddingHorizontal: 12 }}
-          />
-          <Button
-            text="Record"
-            onPress={() => toggleSwitch('record')}
-            variant={voiceRecordEnabled ? 'primary' : 'secondary'}
-            style={{ paddingVertical: 6, paddingHorizontal: 12 }}
-          />
+          <Button text="AI Voice" onPress={() => toggleSwitch('ai')} variant={aiVoiceEnabled ? 'primary' : 'secondary'} style={{ paddingVertical: 6, paddingHorizontal: 12 }} />
+          <Button text="AI Generate" onPress={() => router.push('/ai-generate')} variant="secondary" style={{ paddingVertical: 6, paddingHorizontal: 12 }} />
+          <Button text="Record" onPress={() => toggleSwitch('record')} variant={voiceRecordEnabled ? 'primary' : 'secondary'} style={{ paddingVertical: 6, paddingHorizontal: 12 }} />
         </View>
 
-        {/* Voice Recording Controls */}
+        {/* AI Voice preview */}
+        {aiVoiceEnabled && (
+          <View style={{ alignItems: 'center', marginBottom: 20 }}>
+            <Button text="Preview AI Voice" onPress={() => speakAffirmations(affirmationText)} variant="primary" />
+          </View>
+        )}
+
+        {/* Recording controls */}
         {voiceRecordEnabled && (
           <View style={{ alignItems: 'center', gap: 10, marginBottom: 20 }}>
             {!recording ? (
@@ -453,7 +392,6 @@ export default function CreateTrackScreen() {
                     playRecording();
                   }
                 }} variant="secondary" />
-                {/* Seek bar for recorded voice */}
                 <Slider
                   minimumValue={0}
                   maximumValue={recordedDuration}
@@ -465,8 +403,6 @@ export default function CreateTrackScreen() {
                 />
                 <View style={{ flexDirection: 'row', justifyContent: 'space-around', width: '90%', marginTop: 10 }}>
                   <Button text="Restart Recording" onPress={resetRecording} variant="secondary" />
-                  {/* Placeholder for Trim functionality - can implement later */}
-                  {/* <Button text="Trim" onPress={() => {}} variant="secondary" /> */}
                 </View>
               </>
             )}
@@ -475,47 +411,15 @@ export default function CreateTrackScreen() {
 
         {/* Volume Sliders */}
         <Text style={commonStyles.subtitle}>Affirmation Volume</Text>
-        <Slider
-          minimumValue={0}
-          maximumValue={1}
-          step={0.05}
-          value={affirmationVolume}
-          onValueChange={setAffirmationVolume}
-          accessibilityLabel="Adjust affirmation volume"
-        />
+        <Slider minimumValue={0} maximumValue={1} step={0.05} value={affirmationVolume} onValueChange={setAffirmationVolume} accessibilityLabel="Adjust affirmation volume" />
 
         <Text style={commonStyles.subtitle}>Backing Track Volume</Text>
-        <Slider
-          minimumValue={0}
-          maximumValue={1}
-          step={0.05}
-          value={backingTrackVolume}
-          onValueChange={async (value) => {
-            setBackingTrackVolume(value);
-            if (audioPlaybackRef.current) {
-              await audioPlaybackRef.current.setVolumeAsync(value);
-            }
-          }}
-          accessibilityLabel="Adjust backing track volume"
-        />
+        <Slider minimumValue={0} maximumValue={1} step={0.05} value={backingTrackVolume} onValueChange={async (value) => { setBackingTrackVolume(value); if (audioPlaybackRef.current) { await audioPlaybackRef.current.setVolumeAsync(value); } }} accessibilityLabel="Adjust backing track volume" />
 
         <Text style={commonStyles.subtitle}>Duration: {duration} min</Text>
-        <Slider
-          minimumValue={1}
-          maximumValue={30}
-          step={1}
-          value={duration}
-          onValueChange={setDuration}
-          accessibilityLabel="Set track duration in minutes"
-        />
+        <Slider minimumValue={1} maximumValue={30} step={1} value={duration} onValueChange={setDuration} accessibilityLabel="Set track duration in minutes" />
 
-        {/* Create Track Button */}
-        <Button
-          text="Create Track"
-          onPress={() => console.log('Saving...')}
-          style={{ marginVertical: 24 }}
-          accessibilityLabel="Create track button"
-        />
+        <Button text="Create Track" onPress={() => console.log('Saving...')} style={{ marginVertical: 24 }} accessibilityLabel="Create track button" />
       </ScrollView>
     </KeyboardAvoidingView>
   );

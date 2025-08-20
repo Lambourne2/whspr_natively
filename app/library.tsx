@@ -1,3 +1,4 @@
+// library.tsx
 import React, { useState } from 'react';
 import {
   View,
@@ -58,7 +59,6 @@ const LibraryScreen: React.FC<LibraryScreenProps> = () => {
   const filteredAndSortedAffirmations = () => {
     let filtered = affirmations;
 
-    // Apply search filter
     if (searchQuery.trim()) {
       filtered = filtered.filter(affirmation =>
         affirmation.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -70,12 +70,10 @@ const LibraryScreen: React.FC<LibraryScreenProps> = () => {
       );
     }
 
-    // Apply category filter
     if (selectedFilter !== 'all') {
       filtered = filtered.filter(affirmation => affirmation.intent === selectedFilter);
     }
 
-    // Apply sorting
     filtered.sort((a, b) => {
       switch (selectedSort) {
         case 'recent':
@@ -152,18 +150,28 @@ const LibraryScreen: React.FC<LibraryScreenProps> = () => {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
+        {/* Header with Back arrow and Settings gear */}
         <View style={styles.header}>
-          <Text style={styles.title}>My Library</Text>
           <TouchableOpacity
-            style={styles.filterButton}
-            onPress={() => setShowFilters(!showFilters)}
+            style={styles.headerButton}
+            onPress={() => router.back()}
+            accessibilityLabel="Go back"
+            accessibilityRole="button"
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <Ionicons
-              name={showFilters ? 'close' : 'filter'}
-              size={24}
-              color={colors.text}
-            />
+            <Ionicons name="arrow-back" size={28} color={colors.text} />
+          </TouchableOpacity>
+
+          <Text style={styles.title}>My Library</Text>
+
+          <TouchableOpacity
+            style={styles.headerButton}
+            onPress={() => router.push('/settings')}
+            accessibilityLabel="Settings"
+            accessibilityRole="button"
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Ionicons name="settings" size={28} color={colors.text} />
           </TouchableOpacity>
         </View>
 
@@ -396,6 +404,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: 60,
     paddingBottom: 16,
+  },
+  headerButton: {
+    padding: 4,
   },
   title: {
     fontSize: 32,
